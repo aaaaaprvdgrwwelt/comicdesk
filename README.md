@@ -34,7 +34,7 @@ sudo apt install p7zip-full p7zip-rar   # Debian/Ubuntu
 ```bash
 ./comicdesk.sh            # oder: .venv/bin/python -m comicdesk
 ./comicdesk.sh ~/Comics   # direkt in einem Ordner starten
-./install-desktop.sh      # Eintrag im Anwendungsmenü anlegen
+./install-desktop.sh      # Eintrag im Anwendungsmenü und Symbole anlegen
 ```
 
 Unter Windows und macOS entsprechend `.venv/bin/python -m comicdesk` bzw.
@@ -356,6 +356,9 @@ Quelle nicht füllt, und deine eigenen freien Tags bleiben erhalten.
 - `comicdesk/i18n.py` – Übersetzungstabellen
 - `comicdesk/theme.py` – Stylesheet, aus der Systempalette abgeleitet
 - `comicdesk/icons.py` – selbst gezeichnete SVG-Icons (Theme-unabhängig)
+- `comicdesk/appicon.py`, `comicdesk/assets/` – Programmsymbol; unter 32 px
+  wird eine vereinfachte Zeichnung benutzt, weil die ausführliche dort
+  zerfällt
 
 Neue Sprache: in `i18n.py` ein Dict nach dem Muster von `EN` anlegen und in
 `LANGUAGES` und `TABLE` eintragen. Schlüssel sind die deutschen Quelltext-

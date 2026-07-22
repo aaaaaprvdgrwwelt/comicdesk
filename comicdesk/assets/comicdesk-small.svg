@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4a3a7a"/>
+      <stop offset="1" stop-color="#8a3f78"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="512" height="512" rx="114" fill="url(#bg)"/>
+  <!-- Nur ein Heft, gross und gerade: alles andere zerfaellt unter 32 px -->
+  <rect x="132" y="96" width="248" height="320" rx="20" fill="#fffaf0"/>
+  <rect x="132" y="96" width="40" height="320" rx="20" fill="#e0452f"/>
+  <rect x="152" y="96" width="20" height="320" fill="#e0452f"/>
+  <path d="M212 168 h124 a26 26 0 0 1 26 26 v76 a26 26 0 0 1 -26 26 h-44
+           l-40 40 v-40 h-40 a26 26 0 0 1 -26 -26 v-76 a26 26 0 0 1 26 -26 z"
+        fill="#3a2c5e"/>
+  <circle cx="242" cy="232" r="14" fill="#fffaf0"/>
+  <circle cx="278" cy="232" r="14" fill="#fffaf0"/>
+  <circle cx="314" cy="232" r="14" fill="#fffaf0"/>
+</svg>

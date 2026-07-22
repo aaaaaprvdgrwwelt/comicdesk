@@ -7,6 +7,7 @@ from pathlib import Path
 from PySide6.QtCore import QSettings, QtMsgType, qInstallMessageHandler
 from PySide6.QtWidgets import QApplication
 
+from .appicon import icon as app_icon
 from .i18n import set_language
 from .mainwindow import MainWindow
 from . import theme
@@ -46,6 +47,8 @@ def main() -> int:
     app.setOrganizationName("comicdesk")
     set_language(QSettings("comicdesk", "comicdesk").value("language", "auto"))
     theme.apply(app)
+    app.setWindowIcon(app_icon())
+    app.setDesktopFileName("comicdesk")
     win = MainWindow()
     if len(sys.argv) > 1:
         target = Path(sys.argv[1]).expanduser()
