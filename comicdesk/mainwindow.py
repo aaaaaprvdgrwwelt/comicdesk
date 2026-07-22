@@ -538,6 +538,9 @@ class MainWindow(QMainWindow):
                                 self.choose_match, on_view=True),
             "clear_tags": act("Tags löschen", None, self.clear_tags,
                               on_view=True),
+            "move_collection": act("In Sammlung verschieben …", None,
+                                   self.move_to_collection, "folder",
+                                   on_view=True),
             "rename_tpl": act("Nach Tags benennen", "Ctrl+R",
                               self.rename_by_template, on_view=True),
             "pages": act("Seiten verwalten …", "Ctrl+P", self.edit_pages,
@@ -600,6 +603,9 @@ class MainWindow(QMainWindow):
         menu.addSeparator()
         for key in ("autotag", "choose_match", "clear_tags", "rename_tpl",
                     "pages", "convert"):
+            menu.addAction(a[key])
+        menu.addSeparator()
+        for key in ("move_collection",):
             menu.addAction(a[key])
         menu.addSeparator()
         menu.addAction(a["settings"])
@@ -826,6 +832,8 @@ class MainWindow(QMainWindow):
                 lambda: self._set_favorite(folder, True), "star_off")
         menu.addSeparator()
         add("Hier automatisch taggen", lambda: self._tag_folder(folder), "tag")
+        add("In Sammlung verschieben …",
+            lambda: self.move_to_collection(folder), "folder")
         add("Neuer Ordner …", lambda: self._new_folder_in(folder), "folder_new")
         menu.addSeparator()
         add("Aktualisieren", lambda: self._reload_tree(index), "refresh")
@@ -1111,6 +1119,55 @@ class MainWindow(QMainWindow):
         self._reindex(target)
         self.refresh()
         self.statusBar().showMessage(_("Seiten gespeichert."), 4000)
+
+    def move_to_collection(self, folder: Path | None = None) -> None:
+        """Ordner in eine andere Sammlung verschieben - Datei und Index."""
+        if folder is None:
+            ordner = [p for p in self.selected_paths() if p.is_dir()]
+            if len(ordner) != 1:
+                self.statusBar().showMessage(
+                    _("Bitte genau einen Ordner waehlen."), 4000)
+                return
+            folder = ordner[0]
+        quelle = self.index.collection_for(folder)
+        ziele = [c for c in self.index.collections()
+                 if c.name != quelle and any(Path(r).is_dir() for r in c.roots)]
+        if not ziele:
+            QMessageBox.information(
+                self, _("In Sammlung verschieben"),
+                _("Es gibt keine andere Sammlung mit einem gültigen Ordner."))
+            return
+        name, ok = QInputDialog.getItem(
+            self, _("In Sammlung verschieben"),
+            _("„{folder}“ verschieben nach:").format(folder=folder.name),
+            [c.name for c in ziele], 0, False)
+        if not ok:
+            return
+        eintrag = next(c for c in ziele if c.name == name)
+        wurzel = next(Path(r) for r in eintrag.roots if Path(r).is_dir())
+        ziel = _unique(wurzel / folder.name)
+        if QMessageBox.question(
+            self, _("In Sammlung verschieben"),
+            _("„{folder}“ nach „{collection}“ verschieben?\n\n{source}\n→ "
+              "{target}").format(folder=folder.name, collection=name,
+                                 source=folder, target=ziel),
+        ) != QMessageBox.Yes:
+            return
+        try:
+            shutil.move(str(folder), str(ziel))
+        except OSError as exc:
+            QMessageBox.critical(self, _("In Sammlung verschieben"), str(exc))
+            return
+        anzahl = self.index.move_paths(folder, ziel, name)
+        self.favorites.move_path(folder, ziel)
+        if _is_within(self.current_dir, folder):
+            self.set_directory(ziel)
+        self.refresh_favorites()
+        self.reload_tree_roots()
+        self.refresh()
+        self.statusBar().showMessage(
+            _("Nach „{collection}“ verschoben, {count} Einträge im Index "
+              "angepasst.").format(collection=name, count=anzahl), 6000)
 
     def clear_tags(self) -> None:
         """Tags aus den gewaehlten Dateien entfernen - fuer einen sauberen
@@ -1503,6 +1560,14 @@ def _format_name(template: str, md) -> str | None:
         return None
     name = name.replace("()", "").replace("#,", "")
     return _sanitize(name) or None
+
+
+def _is_within(path: Path, base: Path) -> bool:
+    try:
+        path.relative_to(base)
+    except ValueError:
+        return False
+    return True
 
 
 def _unique(path: Path) -> Path:

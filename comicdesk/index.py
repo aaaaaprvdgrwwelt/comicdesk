@@ -286,6 +286,33 @@ class CollectionIndex:
         con.execute("DELETE FROM comics_fts WHERE path=?", (str(path),))
         con.commit()
 
+    def move_paths(self, old_root: Path, new_root: Path,
+                   collection: str | None) -> int:
+        """Pfade nach einem Verschieben umschreiben statt neu einzulesen.
+
+        Der Inhalt der Dateien aendert sich nicht - nur wo sie liegen und zu
+        welcher Sammlung sie zaehlen. Ein neuer Indexlauf ueber ein
+        Netzlaufwerk kostet Minuten, das hier Millisekunden.
+        """
+        alt, neu = str(old_root), str(new_root)
+        praefix = alt + "/"
+        con = self._con()
+        rows = con.execute(
+            "SELECT path FROM comics WHERE path = ? OR path LIKE ? ESCAPE '\\'",
+            (alt, _escape_like(praefix) + "%")).fetchall()
+        if not rows:
+            return 0
+        for row in rows:
+            pfad = row["path"]
+            rest = pfad[len(alt):]
+            ziel = neu + rest
+            con.execute(
+                "UPDATE comics SET path=?, parent=?, collection=? WHERE path=?",
+                (ziel, str(Path(ziel).parent), collection, pfad))
+            con.execute("UPDATE comics_fts SET path=? WHERE path=?", (ziel, pfad))
+        con.commit()
+        return len(rows)
+
     def prune_missing(self, roots: list[Path] | None = None,
                       collection: str | None = None) -> int:
         """Eintraege wegwerfen, deren Datei es nicht mehr gibt."""

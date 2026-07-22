@@ -176,6 +176,13 @@ bestimmt, worin gesucht wird; „Alle Sammlungen" sucht überall. Umbenennen und
 Löschen einer Sammlung lässt die Comic-Dateien selbst unangetastet, entfernt
 nur die Index-Einträge.
 
+**Ordner zwischen Sammlungen verschieben** — Rechtsklick im Ordnerbaum oder
+*Extras → In Sammlung verschieben …*. Der Ordner wandert dabei auch auf der
+Platte in das Verzeichnis der Zielsammlung. Der Index wird direkt
+umgeschrieben statt neu eingelesen (bei tausenden Heften über ein Netzlaufwerk
+der Unterschied zwischen Millisekunden und Minuten); Favoriten ziehen mit,
+und die Ansicht folgt, wenn du gerade darin stehst.
+
 Gemessen an 300 CBZ in 25 verschachtelten Ordnern: **415 Comics/s** beim
 Erstlauf (10.000 Stück in ~25 Sekunden), ein zweiter Lauf ist 21× schneller,
 weil nur geänderte Dateien neu gelesen werden. Der Index braucht ~830 Byte pro

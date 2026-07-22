@@ -157,6 +157,7 @@ DE = {
     "Sammlungen …": "Sammlungen …",
     "Tags koennen aus {suffix} nicht entfernt werden.":
         "Tags können aus {suffix} nicht entfernt werden.",
+    "Bitte genau einen Ordner waehlen.": "Bitte genau einen Ordner wählen.",
     "Von Hand": "Von Hand",
     "Quelle unbekannt": "Quelle unbekannt",
     "Nicht getaggt": "Nicht getaggt",
@@ -314,6 +315,18 @@ EN = {
     "Fertig: {count} Serien durchsuchbar.":
         "Done: {count} series searchable.",
     "Vorbereiten fehlgeschlagen:\n{error}": "Preparation failed:\n{error}",
+
+    # --- Ordner verschieben
+    "In Sammlung verschieben …": "Move to collection …",
+    "In Sammlung verschieben": "Move to collection",
+    "Bitte genau einen Ordner waehlen.": "Please select exactly one folder.",
+    "Es gibt keine andere Sammlung mit einem gültigen Ordner.":
+        "There is no other collection with a valid folder.",
+    "„{folder}“ verschieben nach:": "Move “{folder}” to:",
+    "„{folder}“ nach „{collection}“ verschieben?\n\n{source}\n→ {target}":
+        "Move “{folder}” to “{collection}”?\n\n{source}\n→ {target}",
+    "Nach „{collection}“ verschoben, {count} Einträge im Index angepasst.":
+        "Moved to “{collection}”, {count} index entries updated.",
 
     # --- Tags loeschen
     "Tags löschen": "Delete tags",
