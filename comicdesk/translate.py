@@ -5,8 +5,10 @@ folge zurueck, im Original und uebersetzt. Der eigentliche Comic bleibt
 unveraendert; wer den Text im Bild ersetzen will, braucht Retusche und Satz -
 das koennen fertige Werkzeuge wie comic-translate besser.
 
-Die Antworten werden nach Bildinhalt zwischengespeichert, nicht nach Dateiname:
-so kostet erneutes Lesen nichts, auch wenn die Datei umbenannt wurde.
+Die Ergebnisse liegen beim Comic (bei CBZ im Archiv, sonst als Datei daneben),
+nicht in einem lokalen Cache - so sind sie auf jedem Rechner da, der auf die
+Sammlung zugreift. Geschluesselt wird nach Bildinhalt statt nach Seitennummer,
+damit sie das Umsortieren oder Loeschen von Seiten ueberleben.
 """
 from __future__ import annotations
 
@@ -20,7 +22,7 @@ from dataclasses import dataclass
 import requests
 
 from .i18n import _
-from .providers.cache import ResponseCache
+from .archive import TRANSLATIONS_NAME
 
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
 DEFAULT_MODEL = "google/gemini-2.5-flash-lite"
@@ -99,6 +101,11 @@ def _shrink(data: bytes) -> tuple[bytes, str]:
         return data, "image/jpeg"
 
 
+def _flatten(value) -> str:
+    """Zeilenumbrueche aus dem Bild zu Leerzeichen - im Panel sonst zerrissen."""
+    return re.sub(r"\s+", " ", str(value or "")).strip()
+
+
 def _parse(text: str) -> list[Bubble]:
     """Antwort in Blasen verwandeln - Modelle verpacken JSON gern in Prosa."""
     cleaned = text.strip()
@@ -121,8 +128,8 @@ def _parse(text: str) -> list[Bubble]:
     for position, item in enumerate(raw, 1):
         if not isinstance(item, dict):
             continue
-        original = str(item.get("original") or "").strip()
-        translation = str(item.get("translation") or "").strip()
+        original = _flatten(item.get("original"))
+        translation = _flatten(item.get("translation"))
         if not original and not translation:
             continue
         try:
@@ -140,13 +147,73 @@ def _parse(text: str) -> list[Bubble]:
     return bubbles
 
 
+class PageStore:
+    """Uebersetzungen liegen beim Comic, nicht im lokalen Cache.
+
+    Geschluesselt wird nach Bildinhalt, nicht nach Seitennummer: so ueberleben
+    sie das Loeschen oder Umsortieren von Seiten.
+    """
+
+    VERSION = 1
+
+    def __init__(self, comic):
+        self.comic = comic
+        self._data: dict = {"version": self.VERSION, "pages": {}}
+        self._dirty = False
+        raw = None
+        try:
+            raw = comic.read_extra(TRANSLATIONS_NAME)
+        except Exception:  # noqa: BLE001
+            raw = None
+        if raw:
+            try:
+                loaded = json.loads(raw.decode("utf-8"))
+                if isinstance(loaded.get("pages"), dict):
+                    self._data = loaded
+            except (json.JSONDecodeError, AttributeError, UnicodeDecodeError):
+                pass
+
+    @staticmethod
+    def key(image: bytes) -> str:
+        return hashlib.sha1(image).hexdigest()
+
+    def get(self, image: bytes, language: str) -> list[Bubble] | None:
+        entry = self._data["pages"].get(self.key(image), {}).get(language)
+        if entry is None:
+            return None
+        return [Bubble(**item) for item in entry]
+
+    def put(self, image: bytes, language: str, bubbles: list[Bubble]) -> None:
+        page = self._data["pages"].setdefault(self.key(image), {})
+        page[language] = [b.__dict__ for b in bubbles]
+        self._dirty = True
+
+    @property
+    def dirty(self) -> bool:
+        return self._dirty
+
+    @property
+    def count(self) -> int:
+        return len(self._data["pages"])
+
+    def save(self) -> bool:
+        """Beim Schliessen schreiben - nicht pro Seite, das Archiv wird dabei
+        neu geschrieben."""
+        if not self._dirty:
+            return False
+        payload = json.dumps(self._data, ensure_ascii=False,
+                             separators=(",", ":")).encode("utf-8")
+        self.comic.write_extra(TRANSLATIONS_NAME, payload)
+        self._dirty = False
+        return True
+
+
 class Translator:
     def __init__(self, api_key: str, model: str = DEFAULT_MODEL,
                  language: str = "Deutsch"):
         self.api_key = (api_key or "").strip()
         self.model = model or DEFAULT_MODEL
         self.language = language or "Deutsch"
-        self._cache = ResponseCache("translations.sqlite", ttl_days=3650)
         self._session = requests.Session()
 
     def available(self) -> tuple[bool, str]:
@@ -154,14 +221,9 @@ class Translator:
             return False, _("Kein OpenRouter-Schlüssel hinterlegt.")
         return True, ""
 
-    def page(self, image: bytes, force: bool = False) -> list[Bubble]:
-        digest = hashlib.sha1(image).hexdigest()
-        key = f"{digest}|{self.model}|{self.language}"
-        if not force:
-            cached = self._cache.get(key)
-            if cached is not None:
-                return [Bubble(**item) for item in cached]
-
+    def page(self, image: bytes) -> list[Bubble]:
+        """Eine Seite uebersetzen. Was schon uebersetzt ist, holt der Aufrufer
+        aus dem PageStore beim Comic - hier wird nichts zwischengespeichert."""
         payload, mime = _shrink(image)
         encoded = base64.b64encode(payload).decode()
         body = {
@@ -199,6 +261,4 @@ class Translator:
             raise TranslationError(
                 _("OpenRouter lieferte keine Antwort: {error}").format(
                     error=str(data.get("error") or "")[:200]))
-        bubbles = _parse(choices[0].get("message", {}).get("content") or "")
-        self._cache.put(key, [b.__dict__ for b in bubbles])
-        return bubbles
+        return _parse(choices[0].get("message", {}).get("content") or "")

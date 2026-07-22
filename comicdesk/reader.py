@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 from .archive import ComicError, ComicFile, open_comic
 from .background import stop_and_detach
 from .config import TranslationSettings
+from .translate import PageStore
 from .i18n import _
 
 FIT_PAGE, FIT_WIDTH, FIT_ORIGINAL = range(3)
@@ -115,7 +116,10 @@ class ReaderWindow(QMainWindow):
 
         self._tr_thread: QThread | None = None
         self._tr_worker: _TranslateWorker | None = None
-        self._tr_pages: dict[int, list] = {}
+        #: Uebersetzungen liegen beim Comic, damit sie auf jedem Rechner da
+        #: sind. Geschrieben wird beim Schliessen, nicht pro Seite - sonst
+        #: wuerde das Archiv jedes Mal neu geschrieben.
+        self._store: PageStore | None = None
 
         self._build_actions()
         self.statusBar().showMessage(_("Laedt ..."))
@@ -189,6 +193,19 @@ class ReaderWindow(QMainWindow):
             return
 
         settings = TranslationSettings.load(QSettings("comicdesk", "comicdesk"))
+        try:
+            data = self.comic.page_bytes(index)
+        except Exception as exc:  # noqa: BLE001
+            self.translation_view.setPlainText(str(exc))
+            return
+
+        if self._store is None:
+            self._store = PageStore(self.comic)
+        gespeichert = self._store.get(data, settings.language)
+        if gespeichert is not None:
+            self._show_bubbles(gespeichert)
+            return
+
         translator = settings.build()
         ok, why = translator.available()
         if not ok:
@@ -196,11 +213,7 @@ class ReaderWindow(QMainWindow):
                 why + "\n\n" + _("Einzutragen unter Extras › Einstellungen › "
                                   "Übersetzung."))
             return
-        try:
-            data = self.comic.page_bytes(index)
-        except Exception as exc:  # noqa: BLE001
-            self.translation_view.setPlainText(str(exc))
-            return
+        self._pending = (index, data, settings.language)
 
         self._stop_translation()
         self.translation_view.setPlainText(_("Wird übersetzt …"))
@@ -219,9 +232,24 @@ class ReaderWindow(QMainWindow):
         if error:
             self.translation_view.setPlainText(error)
             return
-        self._tr_pages[index] = bubbles
+        pending = getattr(self, "_pending", None)
+        if self._store is not None and pending and pending[0] == index:
+            self._store.put(pending[1], pending[2], bubbles)
         if index == self.index:
             self._show_bubbles(bubbles)
+
+    def _save_translations(self) -> None:
+        """Beim Schliessen einmal schreiben - dabei wird das Archiv neu
+        geschrieben, pro Seite waere das viel zu teuer."""
+        if self._store is None or not self._store.dirty:
+            return
+        try:
+            self._store.save()
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(
+                self, _("Übersetzung"),
+                _("Übersetzungen konnten nicht beim Comic gespeichert "
+                  "werden:\n{error}").format(error=exc))
 
     def _show_bubbles(self, bubbles) -> None:
         if not bubbles:
@@ -324,6 +352,7 @@ class ReaderWindow(QMainWindow):
 
     def closeEvent(self, event):  # noqa: N802
         self._stop_translation()
+        self._save_translations()
         self._pool.clear()
         self._pool.waitForDone(2000)
         if self.comic:

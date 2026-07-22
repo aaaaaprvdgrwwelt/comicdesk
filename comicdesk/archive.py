@@ -26,6 +26,9 @@ ARCHIVE_EXT = {".cbz", ".cbr", ".cb7", ".cbt", ".zip"}
 COMIC_EXT = ARCHIVE_EXT | {".pdf"}
 
 CIX_NAME = "ComicInfo.xml"
+#: Zusatzdaten von ComicDesk wandern mit der Datei, nicht in einen lokalen
+#: Cache - sonst sind sie auf dem naechsten Rechner weg.
+TRANSLATIONS_NAME = "comicdesk-translations.json"
 
 _num_re = re.compile(r"(\d+)")
 
@@ -115,6 +118,26 @@ class ComicFile:
               "zuerst nach CBZ konvertieren.").format(
                 suffix=self.path.suffix.upper()))
 
+    # --- Zusatzdaten neben dem Comic ----------------------------------
+    def _sidecar_for(self, name: str) -> Path:
+        return self.path.with_name(self.path.name + "." + name)
+
+    def read_extra(self, name: str) -> bytes | None:
+        """Standardweg: Datei daneben. ZIP legt sie ins Archiv."""
+        path = self._sidecar_for(name)
+        try:
+            return path.read_bytes()
+        except OSError:
+            return None
+
+    def write_extra(self, name: str, data: bytes) -> None:
+        self._sidecar_for(name).write_bytes(data)
+
+    @property
+    def extras_travel_with_file(self) -> bool:
+        """Liegen Zusatzdaten im Archiv (True) oder daneben (False)?"""
+        return False
+
     # --- Metadaten ----------------------------------------------------
     def read_metadata(self) -> GenericMetadata:
         raw = self._read_cix()
@@ -181,6 +204,20 @@ class ZipComic(ComicFile):
         xml = metadata_to_xml(md)
         _zip_replace_member(self.path, CIX_NAME, xml.encode("utf-8"))
         self._reopen()
+
+    def read_extra(self, name: str) -> bytes | None:
+        for entry in self._zf.namelist():
+            if Path(entry).name.lower() == name.lower():
+                return self._zf.read(entry)
+        return None
+
+    def write_extra(self, name: str, data: bytes) -> None:
+        _zip_replace_member(self.path, name, data)
+        self._reopen()
+
+    @property
+    def extras_travel_with_file(self) -> bool:
+        return True
 
     def page_label(self, index: int) -> str:
         return Path(self._names[index]).name

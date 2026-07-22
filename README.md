@@ -109,10 +109,17 @@ sind [comic-translate](https://github.com/ogkalu2/comic-translate) oder
 richtigen Werkzeuge.
 
 Schlüssel und Modell unter *Extras → Einstellungen → Übersetzung*. Seiten
-werden vor dem Senden auf 1400 px verkleinert (spart Token, ohne der Erkennung
-zu schaden) und die Antworten nach Bildinhalt dauerhaft zwischengespeichert —
-erneutes Lesen kostet nichts. Eine Seite liegt je nach Modell bei Bruchteilen
-eines Cents.
+werden vor dem Senden auf 1400 px verkleinert — spart Token, ohne der
+Erkennung zu schaden. Eine Seite liegt je nach Modell bei Bruchteilen eines
+Cents.
+
+**Die Übersetzungen liegen beim Comic**, nicht in einem lokalen Cache: bei CBZ
+als `comicdesk-translations.json` im Archiv, bei den übrigen Formaten als
+Datei daneben. Wer die Sammlung von mehreren Rechnern aus liest, hat sie
+überall. Geschrieben wird beim Schließen des Readers, nicht pro Seite — sonst
+würde das Archiv jedes Mal neu geschrieben. Geschlüsselt wird nach
+Bildinhalt statt nach Seitennummer, damit die Zuordnung das Umsortieren oder
+Löschen von Seiten übersteht.
 
 **Taggen** — rechte Seitenleiste, schreibt `ComicInfo.xml` ins Archiv
 (Standardformat, das auch Komet, Kavita, Komga, ComicRack und ComicTagger lesen).
