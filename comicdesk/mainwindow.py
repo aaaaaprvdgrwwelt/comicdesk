@@ -414,6 +414,13 @@ class MainWindow(QMainWindow):
         self.view = QListView()
         self.view.setModel(self.model)
         self.view.setViewMode(QListView.IconMode)
+        # IconMode schaltet in Qt stillschweigend Movement.Free und Drag&Drop
+        # ein. Damit schaerft jeder Druck auf eine Kachel einen Ziehvorgang,
+        # und Umschalt-Klick waehlt nicht mehr aus, sondern zieht. Kacheln
+        # sollen hier ohnehin nicht verschiebbar sein.
+        self.view.setMovement(QListView.Static)
+        self.view.setDragDropMode(QAbstractItemView.NoDragDrop)
+        self.view.setDragEnabled(False)
         self.view.setItemDelegate(CoverDelegate(self))
         self.view.setResizeMode(QListView.Adjust)
         self.view.setUniformItemSizes(True)
