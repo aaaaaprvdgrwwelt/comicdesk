@@ -325,7 +325,8 @@ class MatchDialog(QDialog):
                     _("Format nicht beschreibbar - erst nach CBZ konvertieren."))
             config = TaggerSettings.load(self.settings).build_config()
             apply_candidate(self.path, candidate, provider,
-                            config.providers, self._query())
+                            config.providers, self._query(),
+                            replace=config.replace_existing)
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, _("Tags speichern"),
                                  _("Fehlgeschlagen:\n{error}").format(error=exc))

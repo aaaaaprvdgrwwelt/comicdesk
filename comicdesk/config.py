@@ -29,6 +29,7 @@ class TaggerSettings:
     threshold: int = DEFAULT_THRESHOLD
     use_cover_match: bool = True
     overwrite_existing: bool = False
+    replace_existing: bool = False
 
     @classmethod
     def load(cls, settings: QSettings) -> TaggerSettings:
@@ -43,6 +44,7 @@ class TaggerSettings:
             threshold=int(settings.value("threshold", DEFAULT_THRESHOLD)),
             use_cover_match=_bool(settings.value("use_cover_match"), True),
             overwrite_existing=_bool(settings.value("overwrite_existing"), False),
+            replace_existing=_bool(settings.value("replace_existing"), False),
         )
         settings.endGroup()
         return obj
@@ -71,6 +73,7 @@ class TaggerSettings:
             threshold=self.threshold,
             use_cover_match=self.use_cover_match,
             overwrite_existing=self.overwrite_existing,
+            replace_existing=self.replace_existing,
             providers=self.build_providers(),
         )
 

@@ -155,6 +155,8 @@ DE = {
     "abgebrochen": "abgebrochen",
     "Oeffnen": "Öffnen",
     "Sammlungen …": "Sammlungen …",
+    "Tags koennen aus {suffix} nicht entfernt werden.":
+        "Tags können aus {suffix} nicht entfernt werden.",
     "Von Hand": "Von Hand",
     "Quelle unbekannt": "Quelle unbekannt",
     "Nicht getaggt": "Nicht getaggt",
@@ -312,6 +314,23 @@ EN = {
     "Fertig: {count} Serien durchsuchbar.":
         "Done: {count} series searchable.",
     "Vorbereiten fehlgeschlagen:\n{error}": "Preparation failed:\n{error}",
+
+    # --- Tags loeschen
+    "Tags löschen": "Delete tags",
+    "Aus {count} Datei(en) alle Tags entfernen?\n\n{names}{more}\n\nDas lässt "
+    "sich nicht rückgängig machen.":
+        "Remove all tags from {count} file(s)?\n\n{names}{more}\n\nThis cannot "
+        "be undone.",
+    "Tags aus {count} Datei(en) entfernt.": "Tags removed from {count} file(s).",
+    "Tags koennen aus {suffix} nicht entfernt werden.":
+        "Tags cannot be removed from {suffix}.",
+    "Vorhandene Tags dabei ersetzen statt ergänzen":
+        "Replace existing tags instead of merging",
+    "Ohne Haken bleiben Felder stehen, welche die Quelle nicht füllt, und "
+    "deine eigenen freien Tags. Mit Haken wird alles verworfen und neu "
+    "geschrieben.":
+        "Unchecked, fields the source does not fill and your own free tags "
+        "stay. Checked, everything is discarded and written fresh.",
 
     # --- Treffer waehlen
     "Treffer wählen …": "Choose match …",

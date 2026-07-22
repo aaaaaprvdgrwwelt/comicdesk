@@ -42,6 +42,8 @@ class AutoTagConfig:
     threshold: int = DEFAULT_THRESHOLD
     use_cover_match: bool = True
     overwrite_existing: bool = False
+    #: Vorhandene Tags verwerfen statt die neuen darueberzulegen.
+    replace_existing: bool = False
     providers: list[MetadataProvider] = field(default_factory=list)
 
 
@@ -207,16 +209,25 @@ def apply_supplements(md: GenericMetadata, query: SearchQuery,
 def apply_candidate(path: Path, candidate: Candidate,
                     provider: MetadataProvider,
                     supplements: list[MetadataProvider] | None = None,
-                    query: SearchQuery | None = None) -> list[str]:
-    """Kandidaten anreichern, ergaenzen und in die Datei schreiben."""
+                    query: SearchQuery | None = None,
+                    replace: bool = False) -> list[str]:
+    """Kandidaten anreichern, ergaenzen und in die Datei schreiben.
+
+    `replace` verwirft die vorhandenen Tags samt eigener freier Tags, statt
+    die neuen darueberzulegen - gedacht fuer Dateien, deren Tags aus einer
+    falschen Zuordnung stammen.
+    """
     provider.enrich(candidate)
     used: list[str] = []
     if supplements and query is not None:
         used = apply_supplements(candidate.metadata, query, supplements)
     comic = archive.open_comic(path)
     try:
-        merged = comic.read_metadata()
-        merged.overlay(candidate.metadata)
+        if replace:
+            merged = candidate.metadata
+        else:
+            merged = comic.read_metadata()
+            merged.overlay(candidate.metadata)
         comic.write_metadata(merged)
     finally:
         comic.close()
@@ -289,7 +300,8 @@ class AutoTagWorker(QObject):
                     threshold=self.config.threshold, notes=notes))
         try:
             used = apply_candidate(path, candidate, by_name[candidate.source],
-                                   self.config.providers, query)
+                                   self.config.providers, query,
+                                   replace=self.config.replace_existing)
         except Exception as exc:  # noqa: BLE001
             return Result(path, "Fehler", candidate.score, candidate.source,
                           summary, str(exc))

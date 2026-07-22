@@ -177,9 +177,18 @@ class SettingsDialog(QDialog):
         self.cover_match.setChecked(self.config.use_cover_match)
         self.overwrite = QCheckBox(_("Auch Dateien anfassen, die schon Tags haben"))
         self.overwrite.setChecked(self.config.overwrite_existing)
+        self.replace = QCheckBox(_("Vorhandene Tags dabei ersetzen statt ergänzen"))
+        self.replace.setChecked(self.config.replace_existing)
+        self.replace.setToolTip(_(
+            "Ohne Haken bleiben Felder stehen, welche die Quelle nicht füllt, "
+            "und deine eigenen freien Tags. Mit Haken wird alles verworfen und "
+            "neu geschrieben."))
+        self.replace.setEnabled(self.overwrite.isChecked())
+        self.overwrite.toggled.connect(self.replace.setEnabled)
         rule_form.addRow(_("Schwellwert"), slider_row)
         rule_form.addRow(self.cover_match)
         rule_form.addRow(self.overwrite)
+        rule_form.addRow(self.replace)
         rule_hint = QLabel(_(
             "Nur Treffer ab diesem Wert werden geschrieben. Alles darunter "
             "landet als „unsicher“ im Protokoll, ohne die Datei zu aendern."
@@ -308,6 +317,7 @@ class SettingsDialog(QDialog):
         self.config.threshold = self.threshold.value()
         self.config.use_cover_match = self.cover_match.isChecked()
         self.config.overwrite_existing = self.overwrite.isChecked()
+        self.config.replace_existing = self.replace.isChecked()
         self.config.save(self.settings)
 
 

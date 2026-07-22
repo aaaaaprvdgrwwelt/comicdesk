@@ -133,6 +133,12 @@ class ComicFile:
               "Datei zuerst nach CBZ konvertieren.").format(
                 suffix=self.path.suffix.upper()))
 
+    def remove_metadata(self) -> bool:
+        """Tags aus der Datei entfernen. True, wenn welche da waren."""
+        raise ComicError(
+            _("Tags koennen aus {suffix} nicht entfernt werden.").format(
+                suffix=self.path.suffix.upper()))
+
     @property
     def writable(self) -> bool:
         return False
@@ -181,6 +187,13 @@ class ZipComic(ComicFile):
         xml = metadata_to_xml(md)
         _zip_replace_member(self.path, CIX_NAME, xml.encode("utf-8"))
         self._reopen()
+
+    def remove_metadata(self) -> bool:
+        if self._read_cix() is None:
+            return False
+        _zip_remove_member(self.path, CIX_NAME)
+        self._reopen()
+        return True
 
     def page_label(self, index: int) -> str:
         return Path(self._names[index]).name
@@ -246,6 +259,24 @@ def _temp_beside(path: Path, suffix: str) -> Path:
     fd, name = tempfile.mkstemp(dir=str(path.parent), suffix=".tmp" + suffix)
     os.close(fd)
     return Path(name)
+
+
+def _zip_remove_member(path: Path, member: str) -> None:
+    """Eintrag aus dem ZIP werfen - dafuer muss es neu geschrieben werden."""
+    tmp = _temp_beside(path, ".cbz")
+    try:
+        with zipfile.ZipFile(path) as src, zipfile.ZipFile(
+            tmp, "w", zipfile.ZIP_DEFLATED
+        ) as dst:
+            for item in src.infolist():
+                if Path(item.filename).name.lower() == member.lower():
+                    continue
+                dst.writestr(item, src.read(item.filename))
+        shutil.copystat(path, tmp)
+        os.replace(tmp, path)
+    except Exception:
+        tmp.unlink(missing_ok=True)
+        raise
 
 
 def _zip_replace_member(path: Path, member: str, data: bytes) -> None:
@@ -383,6 +414,12 @@ class PdfComic(ComicFile):
         md.set_default_page_list(self.page_count)
         md.page_count = self.page_count
         self.sidecar.write_text(metadata_to_xml(md), "utf-8")
+
+    def remove_metadata(self) -> bool:
+        if not self.sidecar.exists():
+            return False
+        self.sidecar.unlink()
+        return True
 
     @property
     def can_edit_pages(self) -> bool:

@@ -536,6 +536,8 @@ class MainWindow(QMainWindow):
                            "tag", on_view=True),
             "choose_match": act("Treffer wählen …", "Ctrl+Shift+T",
                                 self.choose_match, on_view=True),
+            "clear_tags": act("Tags löschen", None, self.clear_tags,
+                              on_view=True),
             "rename_tpl": act("Nach Tags benennen", "Ctrl+R",
                               self.rename_by_template, on_view=True),
             "pages": act("Seiten verwalten …", "Ctrl+P", self.edit_pages,
@@ -596,7 +598,8 @@ class MainWindow(QMainWindow):
         menu = bar.addMenu(_("E&xtras"))
         menu.addAction(a["index"])
         menu.addSeparator()
-        for key in ("autotag", "choose_match", "rename_tpl", "pages", "convert"):
+        for key in ("autotag", "choose_match", "clear_tags", "rename_tpl",
+                    "pages", "convert"):
             menu.addAction(a[key])
         menu.addSeparator()
         menu.addAction(a["settings"])
@@ -1108,6 +1111,43 @@ class MainWindow(QMainWindow):
         self._reindex(target)
         self.refresh()
         self.statusBar().showMessage(_("Seiten gespeichert."), 4000)
+
+    def clear_tags(self) -> None:
+        """Tags aus den gewaehlten Dateien entfernen - fuer einen sauberen
+        Neuanfang, wenn die vorhandenen aus einer falschen Zuordnung stammen."""
+        paths = [p for p in self.selected_paths() if p.is_file()]
+        if not paths:
+            return
+        names = "\n".join(p.name for p in paths[:12])
+        more = ("\n… " + _("und {count} weitere").format(count=len(paths) - 12)
+                if len(paths) > 12 else "")
+        if QMessageBox.question(
+            self, _("Tags löschen"),
+            _("Aus {count} Datei(en) alle Tags entfernen?\n\n{names}{more}\n\n"
+              "Das lässt sich nicht rückgängig machen.").format(
+                count=len(paths), names=names, more=more),
+        ) != QMessageBox.Yes:
+            return
+        geleert = 0
+        fehler = []
+        for path in paths:
+            comic = None
+            try:
+                comic = archive.open_comic(path)
+                if comic.remove_metadata():
+                    geleert += 1
+            except Exception as exc:  # noqa: BLE001
+                fehler.append(f"{path.name}: {exc}")
+            finally:
+                if comic is not None:
+                    comic.close()
+            self.loader.forget(path)
+            self._reindex(path)
+        if fehler:
+            QMessageBox.warning(self, _("Tags löschen"), "\n".join(fehler[:10]))
+        self.refresh()
+        self.statusBar().showMessage(
+            _("Tags aus {count} Datei(en) entfernt.").format(count=geleert), 5000)
 
     def choose_match(self) -> None:
         """Vorschlaege ansehen und selbst waehlen - fuer unsichere Faelle."""
