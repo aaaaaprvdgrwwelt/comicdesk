@@ -492,6 +492,9 @@ EN = {
     "Textkasten": "Caption",
     "Geräusch": "Sound effect",
     "Schild": "Sign",
+    "Das Modell hat die Antwort abgebrochen ({reason}). Noch einmal "
+    "versuchen.":
+        "The model cut its answer short ({reason}). Try again.",
     "Antwort des Modells war kein gültiges JSON.":
         "The model's answer was not valid JSON.",
     "OpenRouter lehnt den Schlüssel ab.": "OpenRouter rejected the key.",

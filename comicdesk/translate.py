@@ -65,6 +65,7 @@ Rules:
 - Include sound effects; translate them if there is a common equivalent,
   otherwise repeat the original
 - If the page has no text at all, return []
+- Answer with compact JSON on a single line. No pretty-printing, no comments.
 """
 
 
@@ -198,23 +199,73 @@ def _flatten(value) -> str:
     return re.sub(r"\s+", " ", str(value or "")).strip()
 
 
-def _parse(text: str) -> list[Bubble]:
-    """Antwort in Blasen verwandeln - Modelle verpacken JSON gern in Prosa."""
+def _objects(text: str):
+    """Vollstaendige {...}-Bloecke herausziehen, Zeichenketten respektierend.
+
+    Rettet den brauchbaren Teil, wenn die Antwort mittendrin abbricht oder in
+    Prosa eingebettet ist - besser elf von zwoelf Blasen als eine Fehlermeldung.
+    """
+    depth = 0
+    start = None
+    in_string = False
+    escaped = False
+    for position, char in enumerate(text):
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            continue
+        if char == '"':
+            in_string = True
+        elif char == "{":
+            if depth == 0:
+                start = position
+            depth += 1
+        elif char == "}":
+            depth = max(0, depth - 1)
+            if depth == 0 and start is not None:
+                yield text[start:position + 1]
+                start = None
+
+
+def _strip_fence(text: str) -> str:
     cleaned = text.strip()
     fence = re.search(r"```(?:json)?\s*(.+?)```", cleaned, re.S)
     if fence:
-        cleaned = fence.group(1).strip()
-    if not cleaned.startswith("["):
-        start, end = cleaned.find("["), cleaned.rfind("]")
-        if start >= 0 and end > start:
-            cleaned = cleaned[start:end + 1]
-    try:
-        raw = json.loads(cleaned)
-    except json.JSONDecodeError as exc:
+        return fence.group(1).strip()
+    # Zaun ohne Abschluss - kommt vor, wenn die Antwort abbricht.
+    return re.sub(r"^```(?:json)?\s*", "", cleaned)
+
+
+def _parse(text: str) -> list[Bubble]:
+    """Antwort in Blasen verwandeln - Modelle verpacken JSON gern in Prosa."""
+    cleaned = _strip_fence(text)
+    raw: list = []
+    gelesen = False
+    start, end = cleaned.find("["), cleaned.rfind("]")
+    if start >= 0 and end > start:
+        try:
+            candidate = json.loads(cleaned[start:end + 1])
+        except json.JSONDecodeError:
+            candidate = None
+        if isinstance(candidate, list):
+            raw, gelesen = candidate, True   # [] heisst: kein Text, kein Fehler
+    if not gelesen:
+        # Abgebrochen oder verziert: Block fuer Block bergen.
+        for block in _objects(cleaned):
+            try:
+                item = json.loads(block)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(item, dict) and ("original" in item or "translation" in item):
+                raw.append(item)
+                gelesen = True
+    if not gelesen:
         raise TranslationError(
-            _("Antwort des Modells war kein gültiges JSON.")) from exc
-    if not isinstance(raw, list):
-        raise TranslationError(_("Antwort des Modells war kein gültiges JSON."))
+            _("Antwort des Modells war kein gültiges JSON."))
 
     bubbles: list[Bubble] = []
     for position, item in enumerate(raw, 1):
@@ -315,9 +366,24 @@ class Translator:
             return False, _("Kein OpenRouter-Schlüssel hinterlegt.")
         return True, ""
 
-    def page(self, image: bytes) -> list[Bubble]:
+    def page(self, image: bytes, attempts: int = 2) -> list[Bubble]:
         """Eine Seite uebersetzen. Was schon uebersetzt ist, holt der Aufrufer
-        aus dem PageStore beim Comic - hier wird nichts zwischengespeichert."""
+        aus dem PageStore beim Comic - hier wird nichts zwischengespeichert.
+
+        Die Modelle antworten nicht deterministisch; ein zweiter Versuch kostet
+        Bruchteile eines Cents und faengt Ausrutscher ab.
+        """
+        letzter: Exception | None = None
+        for versuch in range(max(1, attempts)):
+            try:
+                return self._once(image)
+            except TranslationError as exc:
+                letzter = exc
+                if "JSON" not in str(exc) and "abgebrochen" not in str(exc):
+                    raise
+        raise letzter
+
+    def _once(self, image: bytes) -> list[Bubble]:
         payload, mime = _shrink(image)
         encoded = base64.b64encode(payload).decode()
         body = {
@@ -355,5 +421,15 @@ class Translator:
             raise TranslationError(
                 _("OpenRouter lieferte keine Antwort: {error}").format(
                     error=str(data.get("error") or "")[:200]))
-        bubbles = _parse(choices[0].get("message", {}).get("content") or "")
+        choice = choices[0]
+        content = (choice.get("message") or {}).get("content") or ""
+        reason = choice.get("finish_reason")
+        try:
+            bubbles = _parse(content)
+        except TranslationError:
+            if reason and reason not in ("stop", "end_turn"):
+                raise TranslationError(
+                    _("Das Modell hat die Antwort abgebrochen ({reason}). "
+                      "Noch einmal versuchen.").format(reason=reason)) from None
+            raise
         return reading_order(bubbles, self.right_to_left)
