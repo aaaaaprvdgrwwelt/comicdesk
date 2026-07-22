@@ -67,8 +67,10 @@ nach. Gespeichert wird in `~/.local/share/comicdesk/favorites.json`.
 werden beim Beenden gemerkt. Ein Pfad als Startargument (`./comicdesk.sh ~/X`)
 hat Vorrang und überschreibt das gemerkte Verzeichnis für diesen Start.
 
-**Browsen** — Ordnerbaum links, mit Maus **und** Tastatur bedienbar (Pfeiltasten
-wechseln das Verzeichnis sofort mit). Rechtsklick im Baum bietet Öffnen, zu den
+**Browsen** — der Ordnerbaum links beginnt bei deinen **Sammlungen**, nicht bei
+`/`; das ganze Dateisystem hängt als letzter Eintrag darunter. Unterordner
+werden erst beim Aufklappen gelesen. Mit Maus **und** Tastatur bedienbar
+(Pfeiltasten wechseln das Verzeichnis sofort mit). Rechtsklick im Baum bietet Öffnen, zu den
 Favoriten hinzufügen, hier automatisch taggen, neuer Unterordner. Ordner zeigen
 das Cover ihres ersten Comics mit kleinem Ordner-Abzeichen; abschaltbar unter
 *Ansicht → Ordner mit Cover anzeigen*, dann wird die Ansicht kompakter.
@@ -343,6 +345,7 @@ Quelle nicht füllt, und deine eigenen freien Tags bleiben erhalten.
   RAR-Backend, das `unrar` bräuchte; ComicInfo-Mapping kommt von `comicapi`)
 - `comicdesk/thumbs.py` – Cover-Thumbnails im Threadpool, Platten-Cache
 - `comicdesk/mainwindow.py` – Browser, Kachel-Delegate, Dateioperationen
+- `comicdesk/dirtree.py` – Ordnerbaum mit den Sammlungen als Wurzeln
 - `comicdesk/reader.py` – Lesefenster
 - `comicdesk/metapanel.py` – Tag-Editor
 - `comicdesk/pageeditor.py` – Seiten löschen und umsortieren

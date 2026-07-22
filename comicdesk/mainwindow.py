@@ -5,15 +5,13 @@ import shutil
 from pathlib import Path
 
 from PySide6.QtCore import (
-    QAbstractListModel, QDir, QModelIndex, QRect, QSettings, QSize, Qt,
-    QTimer,
+    QAbstractListModel, QModelIndex, QRect, QSettings, QSize, Qt, QTimer,
 )
 from PySide6.QtGui import (
     QAction, QColor, QFont, QIcon, QKeySequence, QPainter, QPen, QPixmap,
 )
 from PySide6.QtWidgets import (
-    QAbstractItemView, QApplication, QComboBox, QFileSystemModel, QHBoxLayout,
-    QInputDialog, QLabel, QLineEdit, QListView, QListWidget, QListWidgetItem,
+    QAbstractItemView, QApplication, QComboBox, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListView, QListWidget, QListWidgetItem,
     QMainWindow, QMenu, QMessageBox, QSplitter, QStyle, QStyledItemDelegate,
     QToolBar, QToolButton, QTreeView, QVBoxLayout, QWidget,
 )
@@ -23,6 +21,7 @@ from .favorites import Favorites
 from .icons import icon as app_icon
 from .i18n import _, set_language
 from .autotagdialog import AutoTagDialog, SettingsDialog
+from .dirtree import DirTreeModel
 from .index import CollectionIndex
 from .indexdialog import CollectionsDialog
 from .metapanel import MetaPanel
@@ -366,15 +365,14 @@ class MainWindow(QMainWindow):
     def _build_ui(self) -> None:
         style = self.style()
 
-        self.fs_model = QFileSystemModel(self)
-        self.fs_model.setRootPath("")
-        self.fs_model.setFilter(QDir.AllDirs | QDir.NoDotAndDotDot | QDir.Drives)
-
+        self.tree_model = DirTreeModel(self)
         self.tree = QTreeView()
-        self.tree.setModel(self.fs_model)
-        for col in range(1, self.fs_model.columnCount()):
-            self.tree.hideColumn(col)
+        self.tree.setModel(self.tree_model)
         self.tree.setHeaderHidden(True)
+        # Mit Symbolen brauchen die Ordnernamen mehr Platz, sonst steht da
+        # nur noch "0_..".
+        self.tree.setMinimumWidth(210)
+        self.tree.setTextElideMode(Qt.ElideMiddle)
         self.tree.setContextMenuPolicy(Qt.CustomContextMenu)
         self.tree.customContextMenuRequested.connect(self._tree_menu)
         self.tree.clicked.connect(self._tree_selected)
@@ -400,6 +398,7 @@ class MainWindow(QMainWindow):
         fav_layout.addWidget(fav_header)
         fav_layout.addWidget(self.fav_list, 1)
 
+        fav_box.setMinimumHeight(90)
         left = QSplitter(Qt.Vertical)
         left.addWidget(fav_box)
         left.addWidget(self.tree)
@@ -486,6 +485,7 @@ class MainWindow(QMainWindow):
         self.splitter = split
         self.refresh_favorites()
         self.refresh_collections()
+        self.reload_tree_roots()
 
     def _build_actions(self) -> None:
         """Menueleiste mit allem, Werkzeugleiste nur mit dem Haeufigen."""
@@ -629,10 +629,13 @@ class MainWindow(QMainWindow):
             return
         self.current_dir = path
         self.path_edit.setText(str(path))
-        idx = self.fs_model.index(str(path))
-        self.tree.setCurrentIndex(idx)
-        self.tree.scrollTo(idx)
-        self.tree.expand(idx)
+        idx = self.tree_model.index_for(path)
+        if idx.isValid():
+            self.tree.blockSignals(True)
+            self.tree.setCurrentIndex(idx)
+            self.tree.blockSignals(False)
+            self.tree.scrollTo(idx)
+            self.tree.expand(idx)
         self.settings.setValue("last_dir", str(path))
         self.refresh()
         self._update_favorite_action()
@@ -782,7 +785,10 @@ class MainWindow(QMainWindow):
         index = self.tree.indexAt(pos)
         if not index.isValid():
             return
-        menu = self.build_tree_menu(Path(self.fs_model.filePath(index)), index)
+        folder = self.tree_model.path_at(index)
+        if folder is None:
+            return
+        menu = self.build_tree_menu(folder, index)
         menu.exec(self.tree.viewport().mapToGlobal(pos))
 
     def build_tree_menu(self, folder: Path, index: QModelIndex) -> QMenu:
@@ -832,19 +838,20 @@ class MainWindow(QMainWindow):
         except OSError as exc:
             QMessageBox.critical(self, _("Neuer Ordner"), str(exc))
             return
-        self._reload_tree(self.fs_model.index(str(folder)))
+        self._reload_tree(self.tree_model.index_for(folder))
         if folder == self.current_dir:
             self.refresh()
 
     def _reload_tree(self, index: QModelIndex) -> None:
-        self.fs_model.setRootPath("")
-        self.tree.collapse(index)
+        self.tree_model.refresh(index)
         self.tree.expand(index)
 
     def _tree_selected(self, index: QModelIndex) -> None:
         if not index.isValid():
             return
-        path = Path(self.fs_model.filePath(index))
+        path = self.tree_model.path_at(index)
+        if path is None:
+            return
         # set_directory setzt selbst den Baumeintrag - ohne diese Bremse
         # riefe das Signal sich endlos gegenseitig auf.
         if path == self.current_dir:
@@ -913,6 +920,7 @@ class MainWindow(QMainWindow):
         self.favorites.move_path(old, new)
         self.refresh_favorites()
         self.refresh_collections()
+        self.reload_tree_roots()
         return True
 
     def rename_by_template(self) -> None:
@@ -1105,6 +1113,7 @@ class MainWindow(QMainWindow):
     def edit_index(self) -> None:
         CollectionsDialog(self.index, self.current_dir, self).exec()
         self.refresh_collections()
+        self.reload_tree_roots()
         self.refresh()
 
     def reveal_selected(self) -> None:
@@ -1124,6 +1133,14 @@ class MainWindow(QMainWindow):
                 break
 
     # --- Sammlungen ---------------------------------------------------
+    def reload_tree_roots(self) -> None:
+        """Sammlungen als Wurzeln des Ordnerbaums setzen."""
+        self.tree_model.set_collections(self.index.collections())
+        current = self.tree_model.index_for(self.current_dir)
+        if current.isValid():
+            self.tree.setCurrentIndex(current)
+            self.tree.scrollTo(current)
+
     def refresh_collections(self) -> None:
         """Auswahlfeld neu befuellen und die gemerkte Sammlung wiederherstellen."""
         wanted = self.settings.value("active_collection", "")
@@ -1211,6 +1228,7 @@ class MainWindow(QMainWindow):
         added = self.favorites.toggle(target)
         self.refresh_favorites()
         self.refresh_collections()
+        self.reload_tree_roots()
         self.statusBar().showMessage(
             _("„{name}“ zu den Favoriten hinzugefuegt.").format(name=target.name)
             if added else
@@ -1228,6 +1246,7 @@ class MainWindow(QMainWindow):
         self.favorites.remove(target)
         self.refresh_favorites()
         self.refresh_collections()
+        self.reload_tree_roots()
 
     def rename_favorite(self) -> None:
         target = self._selected_favorite()
@@ -1241,11 +1260,13 @@ class MainWindow(QMainWindow):
             self.favorites.rename(target, label.strip())
             self.refresh_favorites()
         self.refresh_collections()
+        self.reload_tree_roots()
 
     def prune_favorites(self) -> None:
         removed = self.favorites.prune_missing()
         self.refresh_favorites()
         self.refresh_collections()
+        self.reload_tree_roots()
         self.statusBar().showMessage(
             _("{count} verschwundene Favoriten entfernt.").format(count=removed),
             4000)
