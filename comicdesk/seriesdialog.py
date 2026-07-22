@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
 )
 
 from . import series as series_mod
+from .background import stop_and_detach
 from .config import TaggerSettings
 from .i18n import _
 from .index import CollectionIndex
@@ -385,7 +386,6 @@ class SeriesDialog(QDialog):
         self.btn_check_all.setEnabled(False)
         self.btn_check_one.setEnabled(False)
         self.btn_stop.setEnabled(True)
-        self.btn_close.setVisible(False)
 
         self.thread = QThread()
         self.checker = SeriesChecker(entries, providers, self.index)
@@ -408,7 +408,6 @@ class SeriesDialog(QDialog):
         self.bar.setVisible(False)
         self.btn_check_all.setEnabled(True)
         self.btn_stop.setEnabled(False)
-        self.btn_close.setVisible(True)
         self._fill_table()
         message = _("Fertig: {done} geprüft, {empty} ohne Ergebnis.").format(
             done=done, empty=empty)
@@ -424,19 +423,7 @@ class SeriesDialog(QDialog):
 
     # ------------------------------------------------------------------
     def _detach(self) -> None:
-        if self.thread is None or not self.thread.isRunning():
-            return
-        if self.checker:
-            self.checker.stop()
-        thread, checker = self.thread, self.checker
-        thread.quit()
-        if not thread.wait(400):
-            parent = self.parent()
-            if parent is not None:
-                pending = getattr(parent, "_pending_threads", None)
-                if pending is None:
-                    pending = parent._pending_threads = []
-                pending.append((thread, checker))
+        stop_and_detach(self, self.thread, self.checker)
         self.thread = self.checker = None
 
     def reject(self) -> None:

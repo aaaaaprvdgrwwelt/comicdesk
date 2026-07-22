@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QWidget,
 )
 
+from .background import stop_and_detach
 from .i18n import _
 from .index import Collection, CollectionIndex, IndexScanner
 
@@ -263,8 +264,8 @@ class CollectionsDialog(QDialog):
         self.thread.start()
 
     def _set_running(self, running: bool) -> None:
-        for widget in (self.btn_index, self.btn_index_all, self.btn_close,
-                       self.collection_list):
+        # Schliessen bleibt bewusst bedienbar - es bricht den Lauf ab.
+        for widget in (self.btn_index, self.btn_index_all, self.collection_list):
             widget.setEnabled(not running)
         self.btn_stop.setEnabled(running)
         if not running:
@@ -294,12 +295,18 @@ class CollectionsDialog(QDialog):
             self.thread = None
         self._next_in_queue()
 
+    def reject(self) -> None:
+        self._detach()
+        super().reject()
+
     def closeEvent(self, event):  # noqa: N802
-        self.stop()
-        if self.thread:
-            self.thread.quit()
-            self.thread.wait(5000)
+        self._detach()
         super().closeEvent(event)
+
+    def _detach(self) -> None:
+        self._queue.clear()
+        stop_and_detach(self, self.thread, self.scanner)
+        self.thread = self.scanner = None
 
 
 #: Frueherer Name.

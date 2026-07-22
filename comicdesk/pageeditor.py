@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
 )
 
 from .archive import ComicError, open_comic
+from .background import stop_and_detach
 from .i18n import _
 from .icons import icon as app_icon
 
@@ -285,7 +286,7 @@ class PageEditorDialog(QDialog):
         if QMessageBox.question(self, _("Seiten speichern"), question) != \
                 QMessageBox.Yes:
             return
-        self._stop_thumbs()
+        self._stop_thumbs(wait=True)
         comic = None
         try:
             comic = open_comic(self.path)
@@ -304,13 +305,19 @@ class PageEditorDialog(QDialog):
         self.accept()
 
     # ------------------------------------------------------------------
-    def _stop_thumbs(self) -> None:
-        if self.worker:
-            self.worker.stop()
-        if self.thread:
+    def _stop_thumbs(self, wait: bool = False) -> None:
+        """`wait=True` vor dem Schreiben: der Vorschau-Thread haelt die Datei
+        offen. Beim Schliessen dagegen nie warten - sonst haengt das Fenster.
+        """
+        if wait and self.thread is not None:
+            if self.worker:
+                self.worker.stop()
             self.thread.quit()
             self.thread.wait(5000)
-            self.thread = None
+            self.thread = self.worker = None
+            return
+        stop_and_detach(self, self.thread, self.worker)
+        self.thread = self.worker = None
 
     def closeEvent(self, event):  # noqa: N802
         self._stop_thumbs()

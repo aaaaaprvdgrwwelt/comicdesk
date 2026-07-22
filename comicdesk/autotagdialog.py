@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 )
 
 from .autotag import Result, run_in_thread
+from .background import stop_and_detach
 from .config import TaggerSettings
 from .i18n import LANGUAGES, _
 
@@ -287,12 +288,14 @@ class SettingsDialog(QDialog):
                 _("Vorbereiten fehlgeschlagen:\n{error}").format(error=error))
         self._refresh_fts_status()
 
+    def reject(self) -> None:
+        stop_and_detach(self, self._fts_thread, self._fts_worker)
+        self._fts_thread = self._fts_worker = None
+        super().reject()
+
     def closeEvent(self, event):  # noqa: N802
-        if self._fts_worker:
-            self._fts_worker.stop()
-        if self._fts_thread:
-            self._fts_thread.quit()
-            self._fts_thread.wait(5000)
+        stop_and_detach(self, self._fts_thread, self._fts_worker)
+        self._fts_thread = self._fts_worker = None
         super().closeEvent(event)
 
     def accept(self) -> None:
