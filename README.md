@@ -97,8 +97,20 @@ Das geht bei **CBZ** und **PDF**. CBR/CB7/CBT sind schreibgeschützt — erst
 Freie Tags landen im `<Tags>`-Element. `Strg+S` speichert.
 
 **Sammlung durchsuchen** (`Strg+F`) — Umschalter „Sammlung" neben dem
-Filterfeld. Sucht über alle indizierten Ordner hinweg, nicht nur im aktuellen.
-Siehe unten. `Strg+G` springt vom Suchtreffer in dessen Ordner.
+Filterfeld, daneben die Auswahl der aktiven Sammlung. Sucht über alle
+indizierten Ordner hinweg, nicht nur im aktuellen. Siehe unten. `Strg+G`
+springt vom Suchtreffer in dessen Ordner.
+
+**Herkunft der Tags** — jede Kachel trägt oben rechts einen Punkt: blau für
+ComicVine, grün für GCD, grau für von Hand eingetragen, orange mit
+Ausrufezeichen für ungetaggt. Im Metadaten-Panel steht die Quelle im Klartext,
+bei automatisch getaggten Dateien mit der Heft-ID. Erkannt wird das am
+`Notes`-Feld; Dateien, die ComicTagger getaggt hat, werden ebenfalls erkannt.
+Es wird nichts dafür geschrieben, die Erkennung liest nur.
+
+**Ungetaggte finden** — *Ansicht → Ungetaggte anzeigen* (`Strg+U`), oder die
+Suche `getaggt:nein`. Die Statuszeile zeigt beim Browsen nebenbei, wie viele
+Comics im aktuellen Ordner noch keine Tags haben.
 
 **Einstellungen** (`Strg+,`) — unter *Extras → Einstellungen …*. Zwei Reiter:
 **Metadaten-Quellen** (ComicVine-API-Key, GCD-Dump, Schwellwert) und
@@ -136,9 +148,27 @@ nur im Dateibereich, in den Metadatenfeldern funktionieren sie normal.
 Für CBR/CB7 wird das `7z`-Kommando gebraucht:
 `sudo apt install p7zip-full p7zip-rar`.
 
+## Sammlungen
+
+Unter *Extras → Sammlungen* legst du beliebig viele benannte Sammlungen an,
+jede mit eigenen Ordnern — etwa „US-Comics" und „Kinderkram". Die Auswahl oben
+bestimmt, worin gesucht wird; „Alle Sammlungen" sucht überall. Umbenennen und
+Löschen einer Sammlung lässt die Comic-Dateien selbst unangetastet, entfernt
+nur die Index-Einträge.
+
+Gemessen an 300 CBZ in 25 verschachtelten Ordnern: **415 Comics/s** beim
+Erstlauf (10.000 Stück in ~25 Sekunden), ein zweiter Lauf ist 21× schneller,
+weil nur geänderte Dateien neu gelesen werden. Der Index braucht ~830 Byte pro
+Comic. CBR und CB7 sind rund 10× langsamer als CBZ, weil zum Einlesen das
+ganze Archiv entpackt werden muss.
+
+Sinnvolle Reihenfolge bei einer neuen Sammlung: erst automatisch taggen
+(`Strg+T`), dann indizieren — der Index liest nur, was schon in den Dateien
+steht.
+
 ## Sammlung durchsuchen
 
-Erst unter „Einstellungen → Sammlung indizieren …" die Ordner festlegen und
+Erst unter *Extras → Sammlungen* die Ordner festlegen und
 einlesen lassen. Der Index liegt in `~/.local/share/comicdesk/index.sqlite` und
 ist reiner Cache — er lässt sich jederzeit neu aufbauen, Quelle der Wahrheit
 bleibt das ComicInfo.xml in der Datei. Ein zweiter Lauf liest nur geänderte
@@ -157,6 +187,8 @@ Suchsyntax — Feldsuchen und freier Text lassen sich mischen:
 | `autor:gottfredson` | beliebige mitwirkende Person |
 | `figur:joker` `team:` `ort:` | Charaktere, Teams, Orte |
 | `titel:"der grosse fall"` | Anführungszeichen für Mehrwortsuche |
+| `getaggt:nein` | alles ohne Tags |
+| `quelle:comicvine` | woher die Tags stammen (`comicvine`, `gcd`, `manual`) |
 | `serie:batman jahr:2019 joker` | alles kombinierbar (UND) |
 
 Weitere Präfixe: `nummer:` `genre:` `sprache:` `imprint:` `arc:` `datei:`.
@@ -219,12 +251,13 @@ Quelle nicht füllt, und deine eigenen freien Tags bleiben erhalten.
 - `comicdesk/metapanel.py` – Tag-Editor
 - `comicdesk/pageeditor.py` – Seiten löschen und umsortieren
 - `comicdesk/favorites.py` – Favoritenliste (JSON)
+- `comicdesk/provenance.py` – erkennt, woher die Tags einer Datei stammen
 - `comicdesk/providers/` – Metadaten-Quellen hinter einer gemeinsamen
   Schnittstelle (`base.py`), aktuell `comicvine.py` und `gcd.py`
 - `comicdesk/autotag.py` – Bewertung und Batch-Lauf im Hintergrund-Thread
 - `comicdesk/autotagdialog.py` – Quellen-Einstellungen und Lauf-Protokoll
 - `comicdesk/index.py` – Sammlungs-Index (SQLite + FTS5) und Suchsyntax
-- `comicdesk/indexdialog.py` – Ordnerauswahl und Scan-Fortschritt
+- `comicdesk/indexdialog.py` – Sammlungsverwaltung und Scan-Fortschritt
 - `comicdesk/i18n.py` – Übersetzungstabellen
 - `comicdesk/icons.py` – selbst gezeichnete SVG-Icons (Theme-unabhängig)
 

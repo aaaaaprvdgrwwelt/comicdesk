@@ -12,7 +12,7 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import (
     QAbstractItemView, QApplication, QFileSystemModel, QHBoxLayout,
-    QInputDialog, QLabel, QLineEdit, QListView, QListWidget,
+    QComboBox, QInputDialog, QLabel, QLineEdit, QListView, QListWidget,
     QListWidgetItem, QMainWindow, QMessageBox, QSplitter, QStyle,
     QStyledItemDelegate, QToolBar, QToolButton, QTreeView, QVBoxLayout, QWidget,
 )
@@ -23,7 +23,7 @@ from .icons import icon as app_icon
 from .i18n import _, set_language
 from .autotagdialog import AutoTagDialog, SettingsDialog
 from .index import CollectionIndex
-from .indexdialog import IndexDialog
+from .indexdialog import CollectionsDialog
 from .metapanel import MetaPanel
 from .pageeditor import PageEditorDialog
 from .reader import ReaderWindow
@@ -38,11 +38,19 @@ PAD = 8
 
 #: Zweite, graue Zeile unter dem Dateinamen - im Suchmodus der Ordner.
 SUBTITLE_ROLE = Qt.UserRole + 1
+#: (hat Tags, Quelle) aus dem Index - fuer die Ecke der Kachel.
+STATUS_ROLE = Qt.UserRole + 2
+
+SOURCE_COLORS = {
+    "comicvine": QColor(60, 130, 200),
+    "gcd": QColor(70, 155, 95),
+    "manual": QColor(150, 150, 150),
+}
 
 SEARCH_PLACEHOLDER = "Sammlung durchsuchen – z. B. serie:batman jahr:1990-1999 joker"
 FILTER_PLACEHOLDER = "Filter (Dateiname) …"
-SEARCH_FIELDS = ("serie: nummer: titel: jahr: verlag: genre: tag: "
-                "figur: team: ort: autor: sprache:")
+SEARCH_FIELDS = ("serie: nummer: titel: jahr: verlag: genre: tag: figur: "
+                "team: ort: autor: sprache: quelle: getaggt:")
 
 
 class CoverDelegate(QStyledItemDelegate):
@@ -98,6 +106,21 @@ class CoverDelegate(QStyledItemDelegate):
                       text_rect.width(), fm.height()),
                 Qt.AlignHCenter | Qt.AlignVCenter, line)
 
+        status = index.data(STATUS_ROLE)
+        if status is not None:
+            has_tags, source = status
+            dot = QRect(cover_rect.right() - 13, cover_rect.top() + 3, 10, 10)
+            painter.setPen(QPen(QColor(255, 255, 255, 200), 1.5))
+            if has_tags:
+                painter.setBrush(SOURCE_COLORS.get(source, SOURCE_COLORS["manual"]))
+                painter.drawEllipse(dot)
+            else:
+                painter.setBrush(QColor(200, 90, 60))
+                painter.drawEllipse(dot)
+                painter.setPen(QPen(QColor(255, 255, 255), 1.6))
+                painter.drawLine(dot.center().x(), dot.top() + 2,
+                                 dot.center().x(), dot.bottom() - 3)
+
         subtitle = index.data(SUBTITLE_ROLE)
         if subtitle:
             color = painter.pen().color()
@@ -142,12 +165,16 @@ class ComicListModel(QAbstractListModel):
         self.file_icon = QIcon()
         #: Im Suchmodus steht der Ordner unter dem Dateinamen.
         self.show_parent = False
+        #: Pfad -> (hat Tags, Quelle); leer heisst "nicht im Index".
+        self.status: dict[str, tuple[bool, str | None]] = {}
         loader.ready.connect(self._on_thumb)
 
-    def set_entries(self, entries: list[Path], show_parent: bool = False) -> None:
+    def set_entries(self, entries: list[Path], show_parent: bool = False,
+                    status: dict[str, tuple[bool, str | None]] | None = None) -> None:
         self.beginResetModel()
         self.entries = entries
         self.show_parent = show_parent
+        self.status = status or {}
         self.endResetModel()
 
     def rowCount(self, parent=QModelIndex()) -> int:  # noqa: N802
@@ -168,6 +195,8 @@ class ComicListModel(QAbstractListModel):
             return str(p)
         if role == SUBTITLE_ROLE:
             return p.parent.name if self.show_parent else None
+        if role == STATUS_ROLE:
+            return None if p.is_dir() else self.status.get(str(p))
         if role == Qt.DecorationRole:
             if p.is_dir():
                 return self.folder_icon
@@ -292,7 +321,13 @@ class MainWindow(QMainWindow):
         bar.setContentsMargins(6, 4, 6, 4)
         bar.addWidget(QLabel(_("Ordner:")))
         bar.addWidget(self.path_edit, 1)
+        self.collection_box = QComboBox()
+        self.collection_box.setMinimumWidth(150)
+        self.collection_box.setToolTip(
+            _("In welcher Sammlung gesucht wird"))
+        self.collection_box.activated.connect(self._collection_chosen)
         bar.addWidget(self.search_toggle)
+        bar.addWidget(self.collection_box)
         bar.addWidget(self.filter_edit, 1)
 
         center = QWidget()
@@ -319,6 +354,7 @@ class MainWindow(QMainWindow):
             left.restoreState(left_state)
         self.splitter = split
         self.refresh_favorites()
+        self.refresh_collections()
 
     def _build_actions(self) -> None:
         """Menueleiste mit allem, Werkzeugleiste nur mit dem Haeufigen."""
@@ -355,6 +391,7 @@ class MainWindow(QMainWindow):
             "delete": act("Loeschen", "Del", self.delete_selected,
                           "delete", on_view=True),
             "search": act("Suchen", "Ctrl+F", self.focus_search, "search"),
+            "untagged": act("Ungetaggte anzeigen", "Ctrl+U", self.show_untagged),
             "autotag": act("Automatisch taggen", "Ctrl+T", self.auto_tag,
                            "tag", on_view=True),
             "rename_tpl": act("Nach Tags benennen", "Ctrl+R",
@@ -398,6 +435,7 @@ class MainWindow(QMainWindow):
 
         menu = bar.addMenu(_("&Ansicht"))
         menu.addAction(a["search"])
+        menu.addAction(a["untagged"])
         self.action_search_mode = QAction(_("In der Sammlung suchen"), self)
         self.action_search_mode.setCheckable(True)
         self.action_search_mode.toggled.connect(self.search_toggle.setChecked)
@@ -466,10 +504,23 @@ class MainWindow(QMainWindow):
         return self.search_toggle.isChecked()
 
     def _toggle_search_mode(self, on: bool) -> None:
+        self.collection_box.setVisible(on)
         self.filter_edit.setPlaceholderText(
             _(SEARCH_PLACEHOLDER if on else FILTER_PLACEHOLDER))
+        # Ordnerfilter und Sammlungssuche haben verschiedene Abfragesprachen;
+        # ein stehengebliebenes "getaggt:nein" wuerde sonst als Dateiname gesucht.
+        self.filter_edit.blockSignals(True)
+        self.filter_edit.clear()
+        self.filter_edit.blockSignals(False)
         self.filter_edit.setFocus()
         self.refresh()
+
+    def show_untagged(self) -> None:
+        """Alle Comics der aktiven Sammlung ohne Tags auflisten."""
+        if not self.search_mode:
+            self.search_toggle.setChecked(True)
+        self.filter_edit.setText("getaggt:nein")
+        self.filter_edit.setFocus()
 
     def focus_search(self) -> None:
         self.search_toggle.setChecked(True)
@@ -497,15 +548,21 @@ class MainWindow(QMainWindow):
         if needle:
             dirs = [p for p in dirs if needle in p.name.lower()]
             comics = [p for p in comics if needle in p.name.lower()]
-        self.model.set_entries(dirs + comics)
+        self.model.set_entries(dirs + comics,
+                               status=self.index.status_for(comics))
         self.meta.clear()
-        self.statusBar().showMessage(
-            _("{comics} Comics, {dirs} Ordner in {path}").format(
-                comics=len(comics), dirs=len(dirs), path=self.current_dir))
+        status = self.model.status
+        untagged = sum(1 for c in comics if not status.get(str(c), (False, None))[0])
+        message = _("{comics} Comics, {dirs} Ordner in {path}").format(
+            comics=len(comics), dirs=len(dirs), path=self.current_dir)
+        if comics and untagged:
+            message += "  ·  " + _("{count} ohne Tags").format(count=untagged)
+        self.statusBar().showMessage(message)
 
     def _refresh_search(self) -> None:
         query = self.filter_edit.text().strip()
-        indexed = self.index.count()
+        collection = self.active_collection
+        indexed = self.index.count(collection)
         if not query:
             self.model.set_entries([])
             self.meta.clear()
@@ -517,12 +574,13 @@ class MainWindow(QMainWindow):
                   "indizieren …“ ausfuehren."))
             return
         try:
-            hits = self.index.search(query)
+            hits = self.index.search(query, collection=collection)
         except Exception as exc:  # noqa: BLE001
             self.statusBar().showMessage(
                 _("Suche fehlgeschlagen: {error}").format(error=exc), 6000)
             return
-        self.model.set_entries(hits, show_parent=True)
+        self.model.set_entries(hits, show_parent=True,
+                               status=self.index.status_for(hits))
         self.meta.clear()
         self.statusBar().showMessage(
             _("{hits} Treffer von {total} indizierten Comics").format(
@@ -601,6 +659,7 @@ class MainWindow(QMainWindow):
         self._reindex(new)
         self.favorites.move_path(old, new)
         self.refresh_favorites()
+        self.refresh_collections()
         return True
 
     def rename_by_template(self) -> None:
@@ -791,7 +850,8 @@ class MainWindow(QMainWindow):
             "Metadaten von ComicVine und der Grand Comics Database."))
 
     def edit_index(self) -> None:
-        IndexDialog(self.index, self.current_dir, self).exec()
+        CollectionsDialog(self.index, self.current_dir, self).exec()
+        self.refresh_collections()
         self.refresh()
 
     def reveal_selected(self) -> None:
@@ -809,6 +869,37 @@ class MainWindow(QMainWindow):
                 self.view.setCurrentIndex(idx)
                 self.view.scrollTo(idx)
                 break
+
+    # --- Sammlungen ---------------------------------------------------
+    def refresh_collections(self) -> None:
+        """Auswahlfeld neu befuellen und die gemerkte Sammlung wiederherstellen."""
+        wanted = self.settings.value("active_collection", "")
+        self.collection_box.blockSignals(True)
+        self.collection_box.clear()
+        names = [c.name for c in self.index.collections()]
+        for name in names:
+            self.collection_box.addItem(name, name)
+        self.collection_box.addItem(_("Alle Sammlungen"), "")
+        self.collection_box.insertSeparator(self.collection_box.count())
+        self.collection_box.addItem(_("Sammlungen verwalten …"), "__manage__")
+        index = self.collection_box.findData(wanted if wanted in names else "")
+        self.collection_box.setCurrentIndex(max(0, index))
+        self.collection_box.blockSignals(False)
+        self.collection_box.setVisible(self.search_mode)
+
+    @property
+    def active_collection(self) -> str | None:
+        """None heisst: ueber alle Sammlungen suchen."""
+        data = self.collection_box.currentData()
+        return data or None
+
+    def _collection_chosen(self, _index: int) -> None:
+        if self.collection_box.currentData() == "__manage__":
+            self.refresh_collections()   # Auswahl zuruecksetzen
+            self.edit_index()
+            return
+        self.settings.setValue("active_collection", self.active_collection or "")
+        self.refresh()
 
     # --- Favoriten ----------------------------------------------------
     def refresh_favorites(self) -> None:
@@ -854,6 +945,7 @@ class MainWindow(QMainWindow):
             return
         added = self.favorites.toggle(target)
         self.refresh_favorites()
+        self.refresh_collections()
         self.statusBar().showMessage(
             _("„{name}“ zu den Favoriten hinzugefuegt.").format(name=target.name)
             if added else
@@ -870,6 +962,7 @@ class MainWindow(QMainWindow):
             return
         self.favorites.remove(target)
         self.refresh_favorites()
+        self.refresh_collections()
 
     def rename_favorite(self) -> None:
         target = self._selected_favorite()
@@ -882,10 +975,12 @@ class MainWindow(QMainWindow):
         if ok:
             self.favorites.rename(target, label.strip())
             self.refresh_favorites()
+        self.refresh_collections()
 
     def prune_favorites(self) -> None:
         removed = self.favorites.prune_missing()
         self.refresh_favorites()
+        self.refresh_collections()
         self.statusBar().showMessage(
             _("{count} verschwundene Favoriten entfernt.").format(count=removed),
             4000)
@@ -934,7 +1029,8 @@ class MainWindow(QMainWindow):
         try:
             comic = archive.open_comic(path)
             try:
-                self.index.upsert(path, comic.read_metadata(), comic.page_count)
+                self.index.upsert(path, comic.read_metadata(), comic.page_count,
+                                  self.index.collection_for(path))
             finally:
                 comic.close()
         except Exception:  # noqa: BLE001

@@ -5,6 +5,7 @@ Wahrheit bleibt das ComicInfo.xml in der jeweiligen Datei.
 """
 from __future__ import annotations
 
+import json
 import os
 import re
 import sqlite3
@@ -16,9 +17,12 @@ from pathlib import Path
 from comicapi.genericmetadata import GenericMetadata
 from PySide6.QtCore import QObject, Signal
 
-from . import archive
+from . import archive, provenance
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+
+#: Name der Sammlung, die bei der Migration alter Indizes entsteht.
+DEFAULT_COLLECTION = "Meine Comics"
 
 #: Suchpraefix -> Spalte. Deutsch und englisch, damit beides funktioniert.
 FIELD_ALIASES = {
@@ -38,7 +42,12 @@ FIELD_ALIASES = {
     "autor": "credits", "zeichner": "credits", "person": "credits",
     "creator": "credits", "credits": "credits",
     "datei": "name", "name": "name", "file": "name",
+    "quelle": "source", "source": "source",
 }
+
+#: Sonderfelder, die keine Textsuche sind.
+BOOL_ALIASES = {"getaggt", "tagged"}
+TRUE_WORDS = {"ja", "yes", "true", "1"}
 
 TEXT_COLUMNS = [
     "series", "issue", "title", "publisher", "imprint", "genre", "language",
@@ -57,6 +66,18 @@ def data_dir() -> Path:
 
 
 @dataclass
+class Collection:
+    """Eine benannte Sammlung: ein Name und die Ordner, die dazugehoeren."""
+
+    name: str
+    roots: list[str]
+
+    @property
+    def paths(self) -> list[Path]:
+        return [Path(r) for r in self.roots]
+
+
+@dataclass
 class Condition:
     column: str
     value: str
@@ -67,10 +88,12 @@ class ParsedQuery:
     fields: list[Condition]
     years: list[tuple[int, int]]
     free_text: list[str]
+    tagged: bool | None = None
 
     @property
     def is_empty(self) -> bool:
-        return not (self.fields or self.years or self.free_text)
+        return not (self.fields or self.years or self.free_text
+                    or self.tagged is not None)
 
 
 def parse_query(text: str) -> ParsedQuery:
@@ -78,13 +101,18 @@ def parse_query(text: str) -> ParsedQuery:
     fields: list[Condition] = []
     years: list[tuple[int, int]] = []
     free: list[str] = []
+    tagged: bool | None = None
     for raw in _token_re.findall(text or ""):
         token = raw.strip()
         if not token:
             continue
         key, sep, value = token.partition(":")
-        column = FIELD_ALIASES.get(key.strip().casefold()) if sep else None
+        key_norm = key.strip().casefold()
         value = value.strip().strip('"')
+        if sep and key_norm in BOOL_ALIASES and value:
+            tagged = value.casefold() in TRUE_WORDS
+            continue
+        column = FIELD_ALIASES.get(key_norm) if sep else None
         if column is None or not value:
             free.append(token.strip('"'))
             continue
@@ -94,7 +122,7 @@ def parse_query(text: str) -> ParsedQuery:
                 years.append(span)
             continue
         fields.append(Condition(column, value))
-    return ParsedQuery(fields, years, free)
+    return ParsedQuery(fields, years, free, tagged)
 
 
 def _year_span(value: str) -> tuple[int, int] | None:
@@ -136,7 +164,8 @@ class CollectionIndex:
                 year INTEGER, publisher TEXT, imprint TEXT, genre TEXT,
                 language TEXT, characters TEXT, teams TEXT, locations TEXT,
                 story_arc TEXT, tags TEXT, credits TEXT, comments TEXT,
-                page_count INTEGER, has_tags INTEGER, indexed_at REAL
+                page_count INTEGER, has_tags INTEGER, source TEXT,
+                indexed_at REAL
             );
             CREATE INDEX IF NOT EXISTS comics_parent ON comics(parent);
             CREATE INDEX IF NOT EXISTS comics_series ON comics(series);
@@ -146,9 +175,32 @@ class CollectionIndex:
             CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
             """
         )
+        self._migrate(con)
         con.execute("INSERT OR REPLACE INTO meta VALUES ('schema', ?)",
                     (str(SCHEMA_VERSION),))
         con.commit()
+
+    def _migrate(self, con: sqlite3.Connection) -> None:
+        """Alte Indizes ohne Sammlungsbegriff nachruesten."""
+        columns = {row[1] for row in con.execute("PRAGMA table_info(comics)")}
+        if "source" not in columns:
+            con.execute("ALTER TABLE comics ADD COLUMN source TEXT")
+        if "collection" not in columns:
+            con.execute("ALTER TABLE comics ADD COLUMN collection TEXT")
+            con.execute("CREATE INDEX IF NOT EXISTS comics_collection "
+                        "ON comics(collection)")
+        row = con.execute("SELECT value FROM meta WHERE key='collections'").fetchone()
+        if row:
+            return
+        # Frueher gab es genau eine Ordnerliste unter 'roots'.
+        old = con.execute("SELECT value FROM meta WHERE key='roots'").fetchone()
+        roots = [r for r in (old["value"].split("\n") if old else []) if r]
+        collections = [{"name": DEFAULT_COLLECTION, "roots": roots}] if roots else []
+        con.execute("INSERT OR REPLACE INTO meta VALUES ('collections', ?)",
+                    (json.dumps(collections, ensure_ascii=False),))
+        if roots:
+            con.execute("UPDATE comics SET collection=? WHERE collection IS NULL",
+                        (DEFAULT_COLLECTION,))
 
     # --- Schreiben ----------------------------------------------------
     def needs_update(self, path: Path) -> bool:
@@ -161,7 +213,8 @@ class CollectionIndex:
         ).fetchone()
         return not row or row["mtime"] != stat.st_mtime or row["size"] != stat.st_size
 
-    def upsert(self, path: Path, md: GenericMetadata, page_count: int) -> None:
+    def upsert(self, path: Path, md: GenericMetadata, page_count: int,
+               collection: str | None = None) -> None:
         stat = path.stat()
         credits = ", ".join(
             f"{c.get('person', '')}" for c in (md.credits or []) if c.get("person")
@@ -190,7 +243,9 @@ class CollectionIndex:
             "credits": credits,
             "comments": md.comments,
             "page_count": page_count,
+            "collection": collection,
             "has_tags": 0 if md.is_empty else 1,
+            "source": provenance.detect(md)[0],
             "indexed_at": time.time(),
         }
         columns = ", ".join(values)
@@ -212,10 +267,15 @@ class CollectionIndex:
         con.execute("DELETE FROM comics_fts WHERE path=?", (str(path),))
         con.commit()
 
-    def prune_missing(self, roots: list[Path] | None = None) -> int:
+    def prune_missing(self, roots: list[Path] | None = None,
+                      collection: str | None = None) -> int:
         """Eintraege wegwerfen, deren Datei es nicht mehr gibt."""
         con = self._con()
-        rows = con.execute("SELECT path FROM comics").fetchall()
+        if collection is None:
+            rows = con.execute("SELECT path FROM comics").fetchall()
+        else:
+            rows = con.execute("SELECT path FROM comics WHERE collection=?",
+                               (collection,)).fetchall()
         gone = []
         for row in rows:
             path = Path(row["path"])
@@ -230,26 +290,86 @@ class CollectionIndex:
         return len(gone)
 
     # --- Lesen --------------------------------------------------------
-    def count(self) -> int:
-        return self._con().execute("SELECT COUNT(*) FROM comics").fetchone()[0]
+    # --- Sammlungen ---------------------------------------------------
+    def collections(self) -> list[Collection]:
+        row = self._con().execute(
+            "SELECT value FROM meta WHERE key='collections'").fetchone()
+        if not row:
+            return []
+        try:
+            raw = json.loads(row["value"])
+        except json.JSONDecodeError:
+            return []
+        return [Collection(str(c.get("name", "")), list(c.get("roots", [])))
+                for c in raw if c.get("name")]
 
-    def roots(self) -> list[str]:
-        rows = self._con().execute(
-            "SELECT value FROM meta WHERE key='roots'").fetchone()
-        return [r for r in (rows["value"].split("\n") if rows else []) if r]
-
-    def set_roots(self, roots: list[str]) -> None:
+    def set_collections(self, collections: list[Collection]) -> None:
         con = self._con()
-        con.execute("INSERT OR REPLACE INTO meta VALUES ('roots', ?)",
-                    ("\n".join(roots),))
+        con.execute(
+            "INSERT OR REPLACE INTO meta VALUES ('collections', ?)",
+            (json.dumps([{"name": c.name, "roots": c.roots} for c in collections],
+                        ensure_ascii=False),))
         con.commit()
 
-    def search(self, text: str, limit: int = 2000) -> list[Path]:
+    def collection(self, name: str) -> Collection | None:
+        for entry in self.collections():
+            if entry.name == name:
+                return entry
+        return None
+
+    def add_collection(self, name: str, roots: list[str] | None = None) -> bool:
+        existing = self.collections()
+        if any(c.name == name for c in existing):
+            return False
+        existing.append(Collection(name, roots or []))
+        self.set_collections(existing)
+        return True
+
+    def rename_collection(self, old: str, new: str) -> None:
+        collections = self.collections()
+        if any(c.name == new for c in collections):
+            return
+        for entry in collections:
+            if entry.name == old:
+                entry.name = new
+        self.set_collections(collections)
+        con = self._con()
+        con.execute("UPDATE comics SET collection=? WHERE collection=?", (new, old))
+        con.commit()
+
+    def delete_collection(self, name: str) -> None:
+        self.set_collections([c for c in self.collections() if c.name != name])
+        con = self._con()
+        con.execute(
+            "DELETE FROM comics_fts WHERE path IN "
+            "(SELECT path FROM comics WHERE collection=?)", (name,))
+        con.execute("DELETE FROM comics WHERE collection=?", (name,))
+        con.commit()
+
+    def count(self, collection: str | None = None) -> int:
+        if collection is None:
+            return self._con().execute("SELECT COUNT(*) FROM comics").fetchone()[0]
+        return self._con().execute(
+            "SELECT COUNT(*) FROM comics WHERE collection=?",
+            (collection,)).fetchone()[0]
+
+    def collection_for(self, path: Path) -> str | None:
+        """Zu welcher Sammlung gehoert dieser Pfad?"""
+        for entry in self.collections():
+            if any(_is_within(path, root) for root in entry.paths):
+                return entry.name
+        return None
+
+    def search(self, text: str, limit: int = 2000,
+               collection: str | None = None) -> list[Path]:
         query = parse_query(text)
         if query.is_empty:
             return []
         where: list[str] = []
         params: list = []
+        if collection is not None:
+            where.append("c.collection = ?")
+            params.append(collection)
 
         for cond in query.fields:
             where.append(f"c.{cond.column} LIKE ? ESCAPE '\\'")  # noqa: S608
@@ -257,6 +377,9 @@ class CollectionIndex:
         for start, end in query.years:
             where.append("c.year BETWEEN ? AND ?")
             params.extend([start, end])
+        if query.tagged is not None:
+            where.append("COALESCE(c.has_tags, 0) = ?")
+            params.append(1 if query.tagged else 0)
 
         sql = "SELECT c.path FROM comics c"
         if query.free_text:
@@ -281,6 +404,24 @@ class CollectionIndex:
             f"ORDER BY v LIMIT ?", (limit,),
         ).fetchall()
         return [r["v"] for r in rows]
+
+    def status_for(self, paths: list[Path]) -> dict[str, tuple[bool, str | None]]:
+        """Pfad -> (hat Tags, Quelle). Fuer die Markierung in der Kachelansicht."""
+        if not paths:
+            return {}
+        out: dict[str, tuple[bool, str | None]] = {}
+        con = self._con()
+        chunk = 400
+        keys = [str(p) for p in paths]
+        for start in range(0, len(keys), chunk):
+            part = keys[start:start + chunk]
+            placeholders = ",".join("?" * len(part))
+            rows = con.execute(
+                f"SELECT path, has_tags, source FROM comics "  # noqa: S608
+                f"WHERE path IN ({placeholders})", part).fetchall()
+            for row in rows:
+                out[row["path"]] = (bool(row["has_tags"]), row["source"])
+        return out
 
     def all_tags(self) -> list[str]:
         seen: set[str] = set()
@@ -323,11 +464,12 @@ class IndexScanner(QObject):
     finished = Signal(int, int, int)   # neu/aktualisiert, uebersprungen, entfernt
 
     def __init__(self, roots: list[Path], index: CollectionIndex,
-                 force: bool = False):
+                 force: bool = False, collection: str | None = None):
         super().__init__()
         self.roots = roots
         self.index = index
         self.force = force
+        self.collection = collection
         self._stop = False
 
     def stop(self) -> None:
@@ -357,10 +499,9 @@ class IndexScanner(QObject):
                     pages = comic.page_count
                 finally:
                     comic.close()
-                self.index.upsert(path, md, pages)
+                self.index.upsert(path, md, pages, self.collection)
                 updated += 1
             except Exception:  # noqa: BLE001
                 skipped += 1
-        removed = self.index.prune_missing(self.roots)
-        self.index.set_roots([str(r) for r in self.roots])
+        removed = self.index.prune_missing(self.roots, self.collection)
         self.finished.emit(updated, skipped, removed)

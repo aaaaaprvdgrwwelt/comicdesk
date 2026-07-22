@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
 
 from .archive import ComicError, ComicFile, open_comic
 from .i18n import _
+from . import provenance
 
 CREDIT_ROLES = [
     ("Autor", "Writer"),
@@ -71,6 +72,11 @@ class MetaPanel(QWidget):
         self.header.setWordWrap(True)
         self.header.setStyleSheet("font-weight:600; padding:6px;")
         root.addWidget(self.header)
+
+        self.source_label = QLabel()
+        self.source_label.setWordWrap(True)
+        self.source_label.setStyleSheet("color:gray; padding:0 6px 6px 6px;")
+        root.addWidget(self.source_label)
 
         area = QScrollArea()
         area.setWidgetResizable(True)
@@ -142,7 +148,9 @@ class MetaPanel(QWidget):
         self.path = None
         self._md = GenericMetadata()
         self._fill(self._md)
+        self.source_label.setText(provenance.describe(self._md))
         self.header.setText(_("Keine Datei ausgewaehlt"))
+        self.source_label.clear()
         self.hint.clear()
         self.set_enabled(False)
 
@@ -169,6 +177,7 @@ class MetaPanel(QWidget):
                 comic.close()
 
         self._fill(self._md)
+        self.source_label.setText(provenance.describe(self._md))
         self.header.setText(
             _("{name}\n{pages} Seiten").format(name=self.path.name, pages=pages))
         self.set_enabled(True)

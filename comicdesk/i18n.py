@@ -142,6 +142,15 @@ DE = {
     "Verschwundene Favoriten aufraeumen": "Verschwundene Favoriten aufräumen",
     "„{name}“ zu den Favoriten hinzugefuegt.":
         "„{name}“ zu den Favoriten hinzugefügt.",
+    "Ordner hinzufuegen …": "Ordner hinzufügen …",
+    "„{name}“ wird durchsucht …": "„{name}“ wird durchsucht …",
+    "Sammlung loeschen": "Sammlung löschen",
+    "Sammlung „{name}“ mit {count} indizierten Comics loeschen?\n\n"
+    "Die Comic-Dateien selbst bleiben unangetastet.":
+        "Sammlung „{name}“ mit {count} indizierten Comics löschen?\n\n"
+        "Die Comic-Dateien selbst bleiben unangetastet.",
+    "Von Hand": "Von Hand",
+    "Nicht getaggt": "Nicht getaggt",
     "Ueber ComicDesk": "Über ComicDesk",
     "Sprache": "Sprache",
     "Einstellungen …": "Einstellungen …",
@@ -236,6 +245,45 @@ EN = {
     "Seiten koennen in {suffix} nicht bearbeitet werden. Datei zuerst nach "
     "CBZ konvertieren.":
         "Pages cannot be edited in {suffix}. Convert the file to CBZ first.",
+
+    # --- Sammlungen
+    "Sammlungen": "Collections",
+    "Sammlungen verwalten …": "Manage collections …",
+    "Alle Sammlungen": "All collections",
+    "In welcher Sammlung gesucht wird": "Which collection is searched",
+    "Jede Sammlung hat eigene Ordner. Beim Indizieren werden sie rekursiv "
+    "nach Comics durchsucht.":
+        "Each collection has its own folders. Indexing scans them recursively "
+        "for comics.",
+    "Neu …": "New …",
+    "Umbenennen …": "Rename …",
+    "Neue Sammlung": "New collection",
+    "Sammlung umbenennen": "Rename collection",
+    "Sammlung loeschen": "Delete collection",
+    "Name der Sammlung:": "Collection name:",
+    "„{name}“ gibt es schon.": "“{name}” already exists.",
+    "Sammlung „{name}“ mit {count} indizierten Comics loeschen?\n\n"
+    "Die Comic-Dateien selbst bleiben unangetastet.":
+        "Delete collection “{name}” with {count} indexed comics?\n\n"
+        "The comic files themselves are left untouched.",
+    "Ordner der Sammlung": "Collection folders",
+    "Ordner in „{name}“": "Folders in “{name}”",
+    "Diese Sammlung indizieren": "Index this collection",
+    "Alle indizieren": "Index all",
+    "Noch keine Sammlung angelegt.": "No collection created yet.",
+    "„{name}“: {count} Comics · insgesamt {total}":
+        "“{name}”: {count} comics · {total} in total",
+    "„{name}“ wird durchsucht …": "Scanning “{name}” …",
+
+    "Ungetaggte anzeigen": "Show untagged",
+    "{count} ohne Tags": "{count} without tags",
+
+    # --- Herkunft der Tags
+    "Grand Comics Database": "Grand Comics Database",
+    "Von Hand": "Entered by hand",
+    "Nicht getaggt": "Not tagged",
+    "Quelle: {source}": "Source: {source}",
+    "Quelle: {source} (Heft-ID {id})": "Source: {source} (issue ID {id})",
 
     # --- Favoriten
     "Favoriten": "Favourites",
