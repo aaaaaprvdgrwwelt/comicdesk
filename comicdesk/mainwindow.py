@@ -16,6 +16,8 @@ from PySide6.QtWidgets import (
     QToolBar, QToolButton, QTreeView, QVBoxLayout, QWidget,
 )
 
+from comicapi.genericmetadata import GenericMetadata
+
 from . import archive
 from .favorites import Favorites
 from .icons import icon as app_icon
@@ -32,6 +34,7 @@ from .seriesdialog import SeriesDialog
 from .thumbs import ThumbLoader
 
 RENAME_TEMPLATE_DEFAULT = "{series} #{issue} ({year}){title_dash}"
+FOLDER_TEMPLATE_DEFAULT = "{series}"
 
 TILE_W = 190
 COVER_H = 250
@@ -840,6 +843,8 @@ class MainWindow(QMainWindow):
             lambda: self.move_to_collection(folder), "folder")
         add("Neuer Ordner …", lambda: self._new_folder_in(folder), "folder_new")
         add("Umbenennen …", lambda: self._rename_folder(folder, index), "rename")
+        add("Nach Serie benennen …",
+            lambda: self._rename_folder_by_tags(folder, index), "rename")
         menu.addSeparator()
         add("Aktualisieren", lambda: self._reload_tree(index), "refresh")
         return menu
@@ -847,6 +852,53 @@ class MainWindow(QMainWindow):
     def _rename_folder(self, folder: Path, index: QModelIndex) -> None:
         name, ok = QInputDialog.getText(
             self, _("Umbenennen"), _("Neuer Name:"), QLineEdit.Normal, folder.name)
+        name = name.strip()
+        if not ok or not name or name == folder.name:
+            return
+        parent = index.parent()
+        if self._do_rename(folder, folder.parent / name):
+            self._reload_tree(parent if parent.isValid() else index)
+
+    def _rename_folder_by_tags(self, folder: Path, index: QModelIndex) -> None:
+        """Ordner nach der Serie seiner Comics benennen.
+
+        ComicTagger kennt das nicht - es leitet den Zielpfad je Datei neu her
+        und schiebt die Dateien dorthin. Wer wie hier ohnehin einen Ordner je
+        Reihe hat, will aber den Ordner umbenennen und die Dateien liegen
+        lassen.
+        """
+        reihen = self.index.folder_series(folder)
+        if not reihen:
+            QMessageBox.information(
+                self, _("Nach Serie benennen"),
+                _("Unter {name} sind keine getaggten Comics im Index. "
+                  "Erst taggen oder die Sammlung neu einlesen.")
+                .format(name=folder.name))
+            return
+        serie, verlag, anzahl, jahr = reihen[0]
+        md = GenericMetadata(series=serie, publisher=verlag or None, year=jahr)
+        vorlage = self.settings.value("folder_template", FOLDER_TEMPLATE_DEFAULT)
+        vorschlag = _format_name(vorlage, md) or serie
+        ziel = folder.parent / vorschlag
+        if ziel != folder and ziel.exists() and jahr:
+            # Ein Nachbarordner heisst schon so. Bei Reihen, die mehrfach neu
+            # aufgelegt wurden ("Zack" 1972 und 1999), unterscheidet das Jahr.
+            vorschlag = _format_name(vorlage + " ({year})", md) or vorschlag
+
+        gesamt = sum(r[2] for r in reihen)
+        if len(reihen) > 1:
+            hinweis = _("{n} von {gesamt} Comics gehören zu „{serie}“, "
+                        "daneben noch {rest} weitere Reihe(n): {liste}").format(
+                n=anzahl, gesamt=gesamt, serie=serie, rest=len(reihen) - 1,
+                liste=", ".join(r[0] for r in reihen[1:4]))
+        else:
+            hinweis = _("Alle {n} getaggten Comics gehören zu „{serie}“.").format(
+                n=anzahl, serie=serie)
+
+        name, ok = QInputDialog.getText(
+            self, _("Nach Serie benennen"),
+            hinweis + "\n\n" + _("Neuer Ordnername:"),
+            QLineEdit.Normal, vorschlag)
         name = name.strip()
         if not ok or not name or name == folder.name:
             return

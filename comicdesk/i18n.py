@@ -355,6 +355,19 @@ EN = {
         "that is usually why - correct them and search again. When a series "
         "name exists several times, the album title helps most.",
     "z. B. Gefährliche Heimkehr": "e.g. Dangerous Homecoming",
+    "Nach Serie benennen …": "Name after series …",
+    "Nach Serie benennen": "Name after series",
+    "Neuer Ordnername:": "New folder name:",
+    "Unter {name} sind keine getaggten Comics im Index. Erst taggen oder die "
+    "Sammlung neu einlesen.":
+        "There are no tagged comics under {name} in the index. Tag them first "
+        "or re-index the collection.",
+    "{n} von {gesamt} Comics gehören zu „{serie}“, daneben noch {rest} "
+    "weitere Reihe(n): {liste}":
+        "{n} of {gesamt} comics belong to \u201c{serie}\u201d, plus {rest} "
+        "further series: {liste}",
+    "Alle {n} getaggten Comics gehören zu „{serie}“.":
+        "All {n} tagged comics belong to \u201c{serie}\u201d.",
     "Erneut suchen": "Search again",
     "Im Browser ansehen": "Open in browser",
     "Öffnet die Seite der Quelle zu diesem Treffer - zum Nachsehen, ob es "

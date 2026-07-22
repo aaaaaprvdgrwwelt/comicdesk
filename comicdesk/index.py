@@ -486,6 +486,22 @@ class CollectionIndex:
         return out
 
     # --- Vollstaendigkeit je Reihe ------------------------------------
+    def folder_series(self, folder: Path) -> list[tuple[str, str, int, int | None]]:
+        """(Serie, Verlag, Anzahl, fruehestes Jahr) unter einem Ordner.
+
+        Kommt aus dem Index, nicht aus den Dateien - die Tags jedes Comics
+        ueber ein Netzlaufwerk zu lesen dauert bei einer grossen Reihe
+        Minuten, das hier Millisekunden.
+        """
+        praefix = _escape_like(str(folder) + "/") + "%"
+        rows = self._con().execute(
+            "SELECT series, publisher, COUNT(*) AS n, MIN(year) AS jahr "
+            "FROM comics WHERE path LIKE ? ESCAPE '\\' "
+            "AND series IS NOT NULL AND TRIM(series) != '' "
+            "GROUP BY series ORDER BY n DESC, series", (praefix,)).fetchall()
+        return [(r["series"], r["publisher"] or "", r["n"], r["jahr"])
+                for r in rows]
+
     def series_rows(self, collection: str | None = None):
         sql = ("SELECT path, series, publisher, issue, issue_sort, source, "
                "source_id, issue_count FROM comics "
