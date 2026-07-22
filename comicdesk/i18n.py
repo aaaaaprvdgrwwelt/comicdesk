@@ -344,6 +344,60 @@ EN = {
     "Ungetaggte anzeigen": "Show untagged",
     "{count} ohne Tags": "{count} without tags",
 
+    # --- Reihen
+    "Reihen": "Series",
+    "Reihen …": "Series …",
+    "Reihe": "Series",
+    "Verlag": "Publisher",
+    "Hefte": "Issues",
+    "Spanne": "Range",
+    "Lücken": "Gaps",
+    "Laut Quelle": "Per source",
+    "Nur Reihen mit Lücken": "Only series with gaps",
+    "Reihen mit nur einem Heft ausblenden": "Hide single-issue series",
+    "Diese Reihe prüfen": "Check this series",
+    "Alle ungeprüften prüfen": "Check all unchecked",
+    "uneinheitlich": "inconsistent",
+    "vollständig": "complete",
+    "{count} fehlen": "{count} missing",
+    "{shown} von {total} Reihen angezeigt · {checked} gegen eine Quelle "
+    "geprüft":
+        "{shown} of {total} series shown · {checked} checked against a source",
+    "{count} Hefte, {span}": "{count} issues, {span}",
+    "Die Heftnummern dieser Reihe sind uneinheitlich (etwa fortlaufend und "
+    "nach Datum gemischt). Deshalb wird hier keine Lücke behauptet.":
+        "The issue numbers in this series are inconsistent (sequential and "
+        "date-based mixed, for example). No gap is claimed here.",
+    "Lücken im eigenen Bestand ({count}):": "Gaps in your own holdings ({count}):",
+    "Das folgt allein aus den vorhandenen Heften und braucht keine Quelle.":
+        "This follows from the issues you own and needs no source.",
+    "Keine Lücken zwischen dem niedrigsten und dem höchsten vorhandenen Heft.":
+        "No gaps between your lowest and highest issue.",
+    "Noch nicht gegen eine Quelle geprüft – ob die Reihe über dein höchstes "
+    "Heft hinaus weiterging, ist damit offen.":
+        "Not yet checked against a source - whether the series continued "
+        "beyond your highest issue is therefore open.",
+    "Laut {source}: {count} Hefte{names}":
+        "Per {source}: {count} issues{names}",
+    "Dort verzeichnet, bei dir nicht vorhanden ({count}):":
+        "Listed there, missing from your collection ({count}):",
+    "Davon nach deinem höchsten Heft: {numbers}":
+        "Of those, after your highest issue: {numbers}",
+    "Deine Sammlung enthält alles, was die Quelle kennt.":
+        "Your collection contains everything the source knows about.",
+    "Das ist eine Angabe der Quelle, keine Gewissheit.":
+        "This is what the source claims, not a certainty.",
+    "Nichts zu prüfen – alles bereits geprüft oder ohne Quell-Kennung.":
+        "Nothing to check - all done already or without a source ID.",
+    "Keine Quelle konfiguriert.": "No source configured.",
+    "Fertig: {done} geprüft, {empty} ohne Ergebnis.":
+        "Done: {done} checked, {empty} without result.",
+
+    "Keine Quell-Kennung in den Tags – diese Reihe lässt sich nicht sicher "
+    "zuordnen. Falls die Hefte getaggt sind, hilft ein neuer Indexlauf.":
+        "No source ID in the tags - this series cannot be matched reliably. "
+        "If the issues are tagged, a fresh index run helps.",
+
     # --- Herkunft der Tags
     "Grand Comics Database": "Grand Comics Database",
     "Von Hand": "Entered by hand",

@@ -28,6 +28,7 @@ from .indexdialog import CollectionsDialog
 from .metapanel import MetaPanel
 from .pageeditor import PageEditorDialog
 from .reader import ReaderWindow
+from .seriesdialog import SeriesDialog
 from .thumbs import ThumbLoader
 
 RENAME_TEMPLATE_DEFAULT = "{series} #{issue} ({year}){title_dash}"
@@ -485,6 +486,7 @@ class MainWindow(QMainWindow):
                           "delete", on_view=True),
             "search": act("Suchen", "Ctrl+F", self.focus_search, "search"),
             "untagged": act("Ungetaggte anzeigen", "Ctrl+U", self.show_untagged),
+            "series": act("Reihen …", "Ctrl+E", self.show_series, "index"),
             "autotag": act("Automatisch taggen", "Ctrl+T", self.auto_tag,
                            "tag", on_view=True),
             "rename_tpl": act("Nach Tags benennen", "Ctrl+R",
@@ -529,6 +531,7 @@ class MainWindow(QMainWindow):
         menu = bar.addMenu(_("&Ansicht"))
         menu.addAction(a["search"])
         menu.addAction(a["untagged"])
+        menu.addAction(a["series"])
         menu.addSeparator()
         self.action_folder_covers = QAction(_("Ordner mit Cover anzeigen"), self)
         self.action_folder_covers.setCheckable(True)
@@ -615,6 +618,10 @@ class MainWindow(QMainWindow):
         self.filter_edit.blockSignals(False)
         self.filter_edit.setFocus()
         self.refresh()
+
+    def show_series(self) -> None:
+        """Reihen-Ansicht: was fehlt, und wie sicher das ist."""
+        SeriesDialog(self.index, self.settings, self.active_collection, self).exec()
 
     def show_untagged(self) -> None:
         """Alle Comics der aktiven Sammlung ohne Tags auflisten."""

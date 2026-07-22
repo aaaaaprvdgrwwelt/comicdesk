@@ -240,6 +240,36 @@ class ComicVineProvider(MetadataProvider):
                     md.add_credit(person["name"], role)
         return candidate
 
+    def series_issues(self, source_id: str) -> tuple[str, list[str]] | None:
+        """Ueber die Heft-ID zur Reihe - ohne Namenssuche, also ohne Fehlgriff."""
+        try:
+            issue_id = int(source_id)
+        except (TypeError, ValueError):
+            return None
+        data = self._get(f"issue/4000-{issue_id}", {"field_list": "volume"})
+        volume = (data.get("results") or {}).get("volume") or {}
+        volume_id = volume.get("id")
+        if not volume_id:
+            return None
+
+        numbers: list[str] = []
+        offset = 0
+        while True:
+            page = self._get("issues", {
+                "filter": f"volume:{volume_id}",
+                "field_list": "issue_number",
+                "limit": 100,
+                "offset": offset,
+            })
+            results = page.get("results") or []
+            numbers += [str(r.get("issue_number") or "").strip()
+                        for r in results if r.get("issue_number")]
+            offset += len(results)
+            total = page.get("number_of_total_results", 0)
+            if not results or offset >= total:
+                break
+        return volume.get("name") or "", sorted(set(numbers), key=_sort_key)
+
     def fetch_cover(self, candidate: Candidate) -> bytes | None:
         if not candidate.cover_url:
             return None
@@ -249,6 +279,13 @@ class ComicVineProvider(MetadataProvider):
             return resp.content
         except requests.RequestException:
             return None
+
+
+def _sort_key(text: str):
+    try:
+        return (0, float(text))
+    except ValueError:
+        return (1, text)
 
 
 def _join_names(items) -> str | None:

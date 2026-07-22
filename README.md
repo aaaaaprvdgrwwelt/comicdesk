@@ -205,6 +205,35 @@ Suchsyntax — Feldsuchen und freier Text lassen sich mischen:
 Weitere Präfixe: `nummer:` `genre:` `sprache:` `imprint:` `arc:` `datei:`.
 Die englischen Namen (`series:` `year:` `publisher:` …) funktionieren ebenso.
 
+## Reihen: was fehlt mir?
+
+*Ansicht → Reihen …* (`Strg+E`). Zwei Aussagen, bewusst nie vermischt:
+
+**Lücke** — zwischen zwei Heften, die du hast, fehlt eine Nummer. Folgt allein
+aus dem eigenen Bestand, braucht keine Quelle, ist nicht bestreitbar.
+
+**Laut Quelle** — dass eine Reihe über dein höchstes Heft hinaus weiterging,
+weiß nur eine externe Quelle. Wird mit Quellenangabe geführt und als Angabe
+gekennzeichnet, nicht als Gewissheit.
+
+Die Zuordnung zur Quell-Reihe läuft über die **in den Tags gespeicherte
+Heft-ID**, nicht über den Serientitel. Das ist der entscheidende Punkt: Eine
+Namenssuche nach „Die Rächer" greift bei GCD die Condor-Auflage von 1979 mit
+47 Heften, obwohl die eigene Reihe eine andere ist. Über die Heft-ID gibt es
+keine Fehlzuordnung. Voraussetzung ist ein Indexlauf, der die IDs eingelesen
+hat; ohne ID sagt der Dialog das offen.
+
+Weil eine lokale Reihe oft mehrere Reihen der Quelle abdeckt (andere Auflage,
+anderer Verlag), werden Hefte vom Anfang **und** vom Ende der Spanne abgefragt
+und die Ergebnisse zusammengeführt.
+
+Nicht jede Reihe ist fortlaufend nummeriert: Magazine wie *Zack* oder *Zorro*
+nummerieren nach Datum (`198303` = März 1983). Wo die Nummerierung uneinheitlich
+ist, wird **keine** Lücke behauptet.
+
+ComicVine erlaubt 200 Anfragen pro Stunde; „Alle ungeprüften prüfen" läuft
+deshalb lange, ist abbrechbar, wiederaufnehmbar und dauerhaft gecacht.
+
 ## Automatisches Taggen
 
 Konfiguration unter „Metadaten-Quellen …“. Beide Quellen können gleichzeitig
@@ -307,6 +336,9 @@ Quelle nicht füllt, und deine eigenen freien Tags bleiben erhalten.
 - `comicdesk/autotag.py` – Bewertung und Batch-Lauf im Hintergrund-Thread
 - `comicdesk/autotagdialog.py` – Quellen-Einstellungen und Lauf-Protokoll
 - `comicdesk/index.py` – Sammlungs-Index (SQLite + FTS5) und Suchsyntax
+- `comicdesk/series.py` – Reihen bündeln, Nummerierung erkennen, Lücken finden
+- `comicdesk/seriescheck.py` – Vollständigkeit über die Quell-Heft-ID
+- `comicdesk/seriesdialog.py` – Reihen-Ansicht
 - `comicdesk/indexdialog.py` – Sammlungsverwaltung und Scan-Fortschritt
 - `comicdesk/i18n.py` – Übersetzungstabellen
 - `comicdesk/theme.py` – Stylesheet, aus der Systempalette abgeleitet

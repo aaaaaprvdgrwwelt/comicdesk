@@ -66,6 +66,31 @@ def detect(md: GenericMetadata) -> tuple[str | None, str | None]:
     return UNKNOWN, None
 
 
+_ID_PATTERNS = [
+    re.compile(r"ComicVine issue id (\d+)"),
+    re.compile(r"\[?Issue ID[: ]*(\d+)\]?", re.IGNORECASE),
+    re.compile(r"comicvine\.gamespot\.com/[^/]+/4000-(\d+)"),
+    re.compile(r"GCD issue id (\d+)"),
+    re.compile(r"comics\.org/issue/(\d+)"),
+]
+
+
+def source_id(md: GenericMetadata) -> str | None:
+    """Heft-ID der Quelle - erlaubt die exakte Zuordnung zur Reihe.
+
+    ComicTagger schreibt sie je nach Version in die Notizen oder nur in den
+    Web-Link; beides wird hier ausgewertet.
+    """
+    if md is None or md.is_empty:
+        return None
+    haystack = f"{md.notes or ''} {md.web_link or ''}"
+    for pattern in _ID_PATTERNS:
+        match = pattern.search(haystack)
+        if match:
+            return match.group(1)
+    return None
+
+
 def stamp_manual(md: GenericMetadata) -> None:
     """Beim Speichern von Hand einen Marker setzen, ohne Vorhandenes zu loeschen."""
     if detect(md)[0] not in (None, UNKNOWN):

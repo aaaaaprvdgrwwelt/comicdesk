@@ -19,7 +19,7 @@ from PySide6.QtCore import QObject, Signal
 
 from . import archive, provenance
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 #: Name der Sammlung, die bei der Migration alter Indizes entsteht.
 DEFAULT_COLLECTION = "Meine Comics"
@@ -173,6 +173,11 @@ class CollectionIndex:
             CREATE VIRTUAL TABLE IF NOT EXISTS comics_fts
                 USING fts5(path UNINDEXED, body, tokenize='unicode61');
             CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
+            CREATE TABLE IF NOT EXISTS series_known (
+                series TEXT, publisher TEXT, source TEXT,
+                numbers TEXT, series_name TEXT, checked_at REAL,
+                PRIMARY KEY (series, publisher)
+            );
             """
         )
         self._migrate(con)
@@ -185,6 +190,13 @@ class CollectionIndex:
         columns = {row[1] for row in con.execute("PRAGMA table_info(comics)")}
         if "source" not in columns:
             con.execute("ALTER TABLE comics ADD COLUMN source TEXT")
+        if "source_id" not in columns:
+            con.execute("ALTER TABLE comics ADD COLUMN source_id TEXT")
+            con.execute("ALTER TABLE comics ADD COLUMN issue_count INTEGER")
+            con.execute("ALTER TABLE comics ADD COLUMN web_link TEXT")
+            # Vorhandene Zeilen kennen die neuen Felder nicht; mtime
+            # zurueckstellen, damit der naechste Lauf sie neu einliest.
+            con.execute("UPDATE comics SET mtime = -1")
         if "collection" not in columns:
             con.execute("ALTER TABLE comics ADD COLUMN collection TEXT")
             con.execute("CREATE INDEX IF NOT EXISTS comics_collection "
@@ -246,6 +258,9 @@ class CollectionIndex:
             "collection": collection,
             "has_tags": 0 if md.is_empty else 1,
             "source": provenance.detect(md)[0],
+            "source_id": provenance.source_id(md),
+            "issue_count": md.issue_count,
+            "web_link": md.web_link,
             "indexed_at": time.time(),
         }
         columns = ", ".join(values)
@@ -422,6 +437,43 @@ class CollectionIndex:
             for row in rows:
                 out[row["path"]] = (bool(row["has_tags"]), row["source"])
         return out
+
+    # --- Vollstaendigkeit je Reihe ------------------------------------
+    def series_rows(self, collection: str | None = None):
+        sql = ("SELECT path, series, publisher, issue, issue_sort, source, "
+               "source_id, issue_count FROM comics "
+               "WHERE series IS NOT NULL AND series != ''")
+        params: list = []
+        if collection is not None:
+            sql += " AND collection = ?"
+            params.append(collection)
+        return self._con().execute(sql, params).fetchall()
+
+    def save_known(self, series: str, publisher: str, source: str,
+                   numbers: list[str], series_name: str = "") -> None:
+        con = self._con()
+        con.execute(
+            "INSERT OR REPLACE INTO series_known VALUES (?,?,?,?,?,?)",
+            (series, publisher or "", source, "\n".join(numbers),
+             series_name, time.time()))
+        con.commit()
+
+    def load_known(self) -> dict[tuple[str, str], tuple[str, list[str], str]]:
+        out: dict[tuple[str, str], tuple[str, list[str], str]] = {}
+        for row in self._con().execute(
+            "SELECT series, publisher, source, numbers, series_name "
+            "FROM series_known"
+        ):
+            numbers = [n for n in (row["numbers"] or "").split("\n") if n]
+            out[(row["series"], row["publisher"])] = (
+                row["source"], numbers, row["series_name"] or "")
+        return out
+
+    def forget_known(self, series: str, publisher: str) -> None:
+        con = self._con()
+        con.execute("DELETE FROM series_known WHERE series=? AND publisher=?",
+                    (series, publisher or ""))
+        con.commit()
 
     def all_tags(self) -> list[str]:
         seen: set[str] = set()

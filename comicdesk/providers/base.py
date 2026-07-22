@@ -96,6 +96,14 @@ class MetadataProvider:
         """Vollstaendige Metadaten nachladen - erst fuer den Gewinner noetig."""
         return candidate
 
+    def series_issues(self, source_id: str) -> tuple[str, list[str]] | None:
+        """Alle Heftnummern der Reihe, zu der dieses Heft gehoert.
+
+        `source_id` ist die Heft-ID dieser Quelle - damit entfaellt jedes
+        Raten ueber Serientitel. Gibt (Reihenname, Nummern) oder None.
+        """
+        return None
+
     def series_info(self, query: SearchQuery) -> GenericMetadata | None:
         """Nur fuer Ergaenzungsquellen: was ueber die Serie bekannt ist."""
         return None

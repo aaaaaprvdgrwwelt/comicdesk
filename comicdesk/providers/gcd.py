@@ -277,6 +277,24 @@ class GcdProvider(MetadataProvider):
             publisher=series["publisher"],
         )
 
+    def series_issues(self, source_id: str) -> tuple[str, list[str]] | None:
+        try:
+            issue_id = int(source_id)
+        except (TypeError, ValueError):
+            return None
+        con = self._connect()
+        row = con.execute(
+            "SELECT s.id, s.name FROM gcd_issue i "
+            "JOIN gcd_series s ON s.id = i.series_id WHERE i.id = ?",
+            (issue_id,)).fetchone()
+        if row is None:
+            return None
+        numbers = [str(r[0]).strip() for r in con.execute(
+            "SELECT number FROM gcd_issue "
+            "WHERE series_id = ? AND variant_of_id IS NULL", (row["id"],))
+            if r[0] and str(r[0]).strip()]
+        return row["name"], sorted(set(numbers), key=_sort_key)
+
     # ------------------------------------------------------------------
     def enrich(self, candidate: Candidate) -> Candidate:
         issue_id = _issue_id_from_notes(candidate.metadata.notes)
@@ -337,6 +355,13 @@ class GcdProvider(MetadataProvider):
             if role and person and (person, role) not in seen:
                 seen.add((person, role))
                 yield person, role
+
+
+def _sort_key(text: str):
+    try:
+        return (0, float(text))
+    except ValueError:
+        return (1, text)
 
 
 def _split_key_date(key_date: str | None):
