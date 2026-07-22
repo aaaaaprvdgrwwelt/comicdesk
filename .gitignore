@@ -1,0 +1,21 @@
+# Virtuelle Umgebung
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Editoren
+.idea/
+.vscode/
+*.swp
+
+# Laufzeitdaten (liegen eigentlich in ~/.config, ~/.cache und
+# ~/.local/share - hier nur zur Sicherheit)
+*.sqlite
+favorites.json
+comicdesk.conf

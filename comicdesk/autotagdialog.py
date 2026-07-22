@@ -1,0 +1,334 @@
+"""Dialoge fuer Quellen-Einstellungen und den Auto-Tag-Lauf."""
+from __future__ import annotations
+
+from pathlib import Path
+
+from PySide6.QtCore import Qt, QSettings
+from PySide6.QtGui import QColor
+from PySide6.QtWidgets import (
+    QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout,
+    QGroupBox, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMessageBox,
+    QProgressBar, QPushButton, QSlider, QTableWidget, QTableWidgetItem,
+    QTabWidget, QVBoxLayout, QWidget,
+)
+
+from .autotag import Result, run_in_thread
+from .config import TaggerSettings
+from .i18n import LANGUAGES, _
+
+STATUS_COLORS = {
+    "getaggt": QColor(38, 132, 66),
+    "unsicher": QColor(190, 130, 20),
+    "kein Treffer": QColor(130, 130, 130),
+    "uebersprungen": QColor(110, 110, 110),
+    "Fehler": QColor(180, 50, 50),
+}
+
+GCD_LANGUAGES = [("Alle Sprachen", ""), ("Deutsch", "de"), ("Englisch", "en"),
+                 ("Franzoesisch", "fr"), ("Italienisch", "it"),
+                 ("Spanisch", "es"), ("Niederlaendisch", "nl")]
+
+
+class SettingsDialog(QDialog):
+    """Alle Einstellungen: Metadaten-Quellen, Automatik, Sprache."""
+
+    def __init__(self, settings: QSettings, parent=None, start_tab: int = 0):
+        super().__init__(parent)
+        self.settings = settings
+        self.config = TaggerSettings.load(settings)
+        self.language_changed = False
+        self._initial_language = settings.value("language", "auto")
+        self.setWindowTitle(_("Einstellungen"))
+        self.setMinimumWidth(640)
+
+        outer = QVBoxLayout(self)
+        self.tabs = QTabWidget()
+        outer.addWidget(self.tabs, 1)
+        sources_tab = QWidget()
+        root = QVBoxLayout(sources_tab)
+        self.tabs.addTab(sources_tab, _("Metadaten-Quellen"))
+
+        cv_box = QGroupBox(_("ComicVine"))
+        cv_form = QFormLayout(cv_box)
+        self.cv_enabled = QCheckBox(_("ComicVine benutzen"))
+        self.cv_enabled.setChecked(self.config.use_comicvine)
+        self.cv_key = QLineEdit(self.config.comicvine_key)
+        self.cv_key.setEchoMode(QLineEdit.PasswordEchoOnEdit)
+        self.cv_key.setPlaceholderText(_("API-Key von comicvine.gamespot.com/api"))
+        cv_form.addRow(self.cv_enabled)
+        cv_form.addRow(_("API-Key"), self.cv_key)
+        cv_hint = QLabel(_(
+            "Kostenlos nach Registrierung. Limit 200 Anfragen/Stunde, deshalb "
+            "wird gedrosselt und dauerhaft gecacht. Liefert Cover, damit ist "
+            "die Bild-Verifikation moeglich."
+        ))
+        cv_hint.setWordWrap(True)
+        cv_hint.setStyleSheet("color:gray;")
+        cv_form.addRow(cv_hint)
+        root.addWidget(cv_box)
+
+        gcd_box = QGroupBox(_("Grand Comics Database (lokaler Dump)"))
+        gcd_form = QFormLayout(gcd_box)
+        self.gcd_enabled = QCheckBox(_("GCD benutzen"))
+        self.gcd_enabled.setChecked(self.config.use_gcd)
+        path_row = QHBoxLayout()
+        self.gcd_path = QLineEdit(self.config.gcd_path)
+        self.gcd_path.setPlaceholderText(_("Pfad zur SQLite-Datei aus dem GCD-Dump"))
+        browse = QPushButton(_("Waehlen …"))
+        browse.clicked.connect(self._pick_db)
+        index_btn = QPushButton(_("Indizes anlegen"))
+        index_btn.setToolTip(_("Einmalig ausfuehren - beschleunigt die Suche erheblich."))
+        index_btn.clicked.connect(self._build_indexes)
+        path_row.addWidget(self.gcd_path, 1)
+        path_row.addWidget(browse)
+        path_row.addWidget(index_btn)
+        self.gcd_lang = QComboBox()
+        for label, code in GCD_LANGUAGES:
+            self.gcd_lang.addItem(_(label), code)
+        idx = self.gcd_lang.findData(self.config.gcd_language)
+        self.gcd_lang.setCurrentIndex(max(0, idx))
+        gcd_form.addRow(self.gcd_enabled)
+        gcd_form.addRow(_("Datenbank"), path_row)
+        gcd_form.addRow(_("Nur Sprache"), self.gcd_lang)
+        gcd_hint = QLabel(_(
+            "SQLite3-Dump von comics.org/download (Account noetig, Daten "
+            "CC-BY). Offline und ohne Limit, stark bei europaeischen "
+            "Verlagen. Enthaelt keine Cover, daher kein Bildabgleich."
+        ))
+        gcd_hint.setWordWrap(True)
+        gcd_hint.setStyleSheet("color:gray;")
+        gcd_form.addRow(gcd_hint)
+        root.addWidget(gcd_box)
+
+        rule_box = QGroupBox(_("Automatik"))
+        rule_form = QFormLayout(rule_box)
+        slider_row = QHBoxLayout()
+        self.threshold = QSlider(Qt.Horizontal)
+        self.threshold.setRange(50, 100)
+        self.threshold.setValue(self.config.threshold)
+        self.threshold_label = QLabel(f"{self.config.threshold}")
+        self.threshold.valueChanged.connect(
+            lambda v: self.threshold_label.setText(str(v)))
+        slider_row.addWidget(self.threshold, 1)
+        slider_row.addWidget(self.threshold_label)
+        self.cover_match = QCheckBox(_(
+            "Treffer per Cover-Bildvergleich absichern (nur ComicVine, "
+            "langsamer)"))
+        self.cover_match.setChecked(self.config.use_cover_match)
+        self.overwrite = QCheckBox(_("Auch Dateien anfassen, die schon Tags haben"))
+        self.overwrite.setChecked(self.config.overwrite_existing)
+        rule_form.addRow(_("Schwellwert"), slider_row)
+        rule_form.addRow(self.cover_match)
+        rule_form.addRow(self.overwrite)
+        rule_hint = QLabel(_(
+            "Nur Treffer ab diesem Wert werden geschrieben. Alles darunter "
+            "landet als „unsicher“ im Protokoll, ohne die Datei zu aendern."
+        ))
+        rule_hint.setWordWrap(True)
+        rule_hint.setStyleSheet("color:gray;")
+        rule_form.addRow(rule_hint)
+        root.addWidget(rule_box)
+
+        root.addStretch(1)
+
+        general = QWidget()
+        gform = QFormLayout(general)
+        self.language = QComboBox()
+        for code, label in LANGUAGES.items():
+            self.language.addItem(_(label), code)
+        idx = self.language.findData(self._initial_language)
+        self.language.setCurrentIndex(max(0, idx))
+        gform.addRow(_("Sprache"), self.language)
+        lang_hint = QLabel(_(
+            "„Automatisch“ folgt der Systemsprache. Die Umstellung greift "
+            "sofort, das Fenster wird dabei neu aufgebaut."))
+        lang_hint.setWordWrap(True)
+        lang_hint.setStyleSheet("color:gray;")
+        gform.addRow(lang_hint)
+        self.tabs.addTab(general, _("Allgemein"))
+        self.tabs.setCurrentIndex(start_tab)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        outer.addWidget(buttons)
+
+    def _pick_db(self) -> None:
+        path, _selected_filter = QFileDialog.getOpenFileName(
+            self, _("GCD-SQLite-Dump waehlen"),
+            self.gcd_path.text() or str(Path.home()),
+            _("SQLite-Datenbank (*.db *.sqlite *.sqlite3 *.gcd);;"
+              "Alle Dateien (*)"))
+        if path:
+            self.gcd_path.setText(path)
+
+    def _build_indexes(self) -> None:
+        from .providers.gcd import GcdProvider
+
+        provider = GcdProvider(self.gcd_path.text())
+        ok, why = provider.available()
+        if not ok:
+            QMessageBox.warning(self, _("GCD"), why)
+            return
+        try:
+            provider.ensure_indexes()
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(
+                self, _("GCD"),
+                _("Indizes fehlgeschlagen:\n{error}").format(error=exc))
+            return
+        QMessageBox.information(self, _("GCD"), _("Indizes sind angelegt."))
+
+    def accept(self) -> None:
+        self.config.use_comicvine = self.cv_enabled.isChecked()
+        self.config.comicvine_key = self.cv_key.text().strip()
+        self.config.use_gcd = self.gcd_enabled.isChecked()
+        self.config.gcd_path = self.gcd_path.text().strip()
+        self.config.gcd_language = self.gcd_lang.currentData()
+        self.config.threshold = self.threshold.value()
+        self.config.use_cover_match = self.cover_match.isChecked()
+        self.config.overwrite_existing = self.overwrite.isChecked()
+        self.config.save(self.settings)
+
+        chosen = self.language.currentData()
+        if chosen != self._initial_language:
+            self.settings.setValue("language", chosen)
+            self.settings.sync()
+            self.language_changed = True
+        super().accept()
+
+
+#: Frueherer Name - der Auto-Tag-Dialog oeffnet damit direkt den Quellen-Tab.
+SourcesDialog = SettingsDialog
+
+
+# ---------------------------------------------------------------------------
+class AutoTagDialog(QDialog):
+    """Fortschritt und Protokoll eines Auto-Tag-Laufs."""
+
+    COLUMNS = ["Datei", "Status", "Score", "Quelle", "Treffer", "Anmerkung"]
+
+    def __init__(self, paths: list[Path], settings: QSettings, parent=None):
+        super().__init__(parent)
+        self.paths = paths
+        self.settings = settings
+        self.thread = None
+        self.worker = None
+        self.counts: dict[str, int] = {}
+
+        self.setWindowTitle(
+            _("Automatisch taggen – {count} Datei(en)").format(count=len(paths)))
+        self.resize(1000, 560)
+
+        root = QVBoxLayout(self)
+        self.status = QLabel(_("Bereit."))
+        root.addWidget(self.status)
+        self.bar = QProgressBar()
+        self.bar.setRange(0, len(paths))
+        root.addWidget(self.bar)
+
+        self.table = QTableWidget(0, len(self.COLUMNS))
+        self.table.setHorizontalHeaderLabels([_(c) for c in self.COLUMNS])
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.Stretch)
+        header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(5, QHeaderView.Stretch)
+        self.source_labels: dict[str, str] = {}
+        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        root.addWidget(self.table, 1)
+
+        row = QHBoxLayout()
+        self.btn_settings = QPushButton(_("Quellen …"))
+        self.btn_settings.clicked.connect(self._open_settings)
+        self.btn_start = QPushButton(_("Starten"))
+        self.btn_start.clicked.connect(self.start)
+        self.btn_stop = QPushButton(_("Abbrechen"))
+        self.btn_stop.setEnabled(False)
+        self.btn_stop.clicked.connect(self.stop)
+        self.btn_close = QPushButton(_("Schliessen"))
+        self.btn_close.clicked.connect(self.reject)
+        row.addWidget(self.btn_settings)
+        row.addStretch(1)
+        row.addWidget(self.btn_start)
+        row.addWidget(self.btn_stop)
+        row.addWidget(self.btn_close)
+        root.addLayout(row)
+
+    # ------------------------------------------------------------------
+    def _open_settings(self) -> None:
+        SourcesDialog(self.settings, self).exec()
+
+    def start(self) -> None:
+        config = TaggerSettings.load(self.settings).build_config()
+        if not config.providers:
+            QMessageBox.information(
+                self, _("Keine Quelle"),
+                _("Es ist keine Quelle konfiguriert. Unter „Quellen …“ einen "
+                  "ComicVine-API-Key eintragen oder einen GCD-Dump "
+                  "auswaehlen."))
+            return
+        unavailable = [f"{_(p.label)}: {why}"
+                       for p in config.providers for ok, why in [p.available()] if not ok]
+        if len(unavailable) == len(config.providers):
+            QMessageBox.warning(self, _("Keine Quelle nutzbar"),
+                                "\n".join(unavailable))
+            return
+
+        self.source_labels = {p.name: _(p.label) for p in config.providers}
+        self.table.setRowCount(0)
+        self.counts.clear()
+        self.btn_start.setEnabled(False)
+        self.btn_stop.setEnabled(True)
+        self.btn_settings.setEnabled(False)
+
+        self.thread, self.worker = run_in_thread(self.paths, config)
+        self.worker.progress.connect(self._on_progress)
+        self.worker.result.connect(self._on_result)
+        self.worker.finished.connect(self._on_finished)
+        self.thread.start()
+
+    def stop(self) -> None:
+        if self.worker:
+            self.worker.stop()
+            self.status.setText(_("Wird nach der laufenden Datei beendet …"))
+
+    def _on_progress(self, done: int, total: int, name: str) -> None:
+        self.bar.setValue(done - 1)
+        self.status.setText(
+            _("[{done}/{total}] {name}").format(done=done, total=total, name=name))
+
+    def _on_result(self, result: Result) -> None:
+        self.counts[result.status] = self.counts.get(result.status, 0) + 1
+        row = self.table.rowCount()
+        self.table.insertRow(row)
+        values = [result.path.name, _(result.status),
+                  str(result.score) if result.score else "",
+                  self.source_labels.get(result.source, result.source),
+                  result.summary, result.detail]
+        for col, value in enumerate(values):
+            item = QTableWidgetItem(value)
+            if col == 1 and result.status in STATUS_COLORS:
+                item.setForeground(STATUS_COLORS[result.status])
+            self.table.setItem(row, col, item)
+        self.table.scrollToBottom()
+        self.bar.setValue(self.bar.value() + 1)
+
+    def _on_finished(self) -> None:
+        self.btn_start.setEnabled(True)
+        self.btn_stop.setEnabled(False)
+        self.btn_settings.setEnabled(True)
+        self.bar.setValue(len(self.paths))
+        summary = ", ".join(f"{v}× {_(k)}" for k, v in sorted(self.counts.items()))
+        self.status.setText(
+            _("Fertig. {summary}").format(summary=summary) if summary
+            else _("Fertig."))
+        if self.thread:
+            self.thread.quit()
+            self.thread.wait(3000)
+
+    def closeEvent(self, event):  # noqa: N802
+        self.stop()
+        if self.thread:
+            self.thread.quit()
+            self.thread.wait(5000)
+        super().closeEvent(event)

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=ComicDesk
+Comment=Dateimanager fuer Comics
+Exec=@PREFIX@/comicdesk.sh %f
+Terminal=false
+Categories=Graphics;Viewer;FileTools;
+MimeType=application/vnd.comicbook+zip;application/vnd.comicbook-rar;application/pdf;

@@ -1,0 +1,263 @@
+# ComicDesk
+
+Ein Dateimanager, der nur Comics kennt: browsen, lesen, taggen, umbenennen,
+kopieren, verschieben, löschen. Python + Qt (PySide6), läuft unter Linux,
+Windows und macOS. Oberfläche auf Deutsch und Englisch.
+
+Tags werden als `ComicInfo.xml` ins Archiv geschrieben — dasselbe Format, das
+ComicTagger, Komga, Kavita und ComicRack lesen. Automatisches Taggen gegen
+ComicVine oder einen lokalen Dump der Grand Comics Database.
+
+> Status: nutzbar, aber jung. Entwickelt und getestet unter Linux; Windows und
+> macOS sollten funktionieren (reines Qt/Python), sind aber ungetestet. Es gibt
+> noch keine automatisierte Testsuite — siehe [Bekannte Grenzen](#bekannte-grenzen).
+
+## Installation
+
+Voraussetzung ist Python 3.10 oder neuer.
+
+```bash
+git clone https://github.com/aaaaaprvdgrwwelt/comicdesk.git
+cd comicdesk
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+```
+
+Für CBR und CB7 wird zusätzlich `7z` gebraucht:
+
+```bash
+sudo apt install p7zip-full p7zip-rar   # Debian/Ubuntu
+```
+
+## Starten
+
+```bash
+./comicdesk.sh            # oder: .venv/bin/python -m comicdesk
+./comicdesk.sh ~/Comics   # direkt in einem Ordner starten
+./install-desktop.sh      # Eintrag im Anwendungsmenü anlegen
+```
+
+Unter Windows und macOS entsprechend `.venv/bin/python -m comicdesk` bzw.
+`.venv\Scripts\python -m comicdesk`.
+
+## Wo Daten liegen
+
+| Was | Wo |
+|---|---|
+| Einstellungen, zuletzt besuchter Ordner | `~/.config/comicdesk/comicdesk.conf` |
+| Favoriten | `~/.local/share/comicdesk/favorites.json` |
+| Suchindex | `~/.local/share/comicdesk/index.sqlite` |
+| Cover-Thumbnails, ComicVine-Cache | `~/.cache/comicdesk/` |
+
+Alles davon ist entbehrlich und wird bei Bedarf neu aufgebaut. Die Wahrheit
+über einen Comic steht immer im `ComicInfo.xml` in der Datei selbst.
+
+## Funktionen
+
+**Favoriten** — links oben. `Strg+D` legt den markierten Comic ab, oder den
+aktuellen Ordner wenn nichts markiert ist; derselbe Befehl entfernt ihn wieder
+(der Stern in der Werkzeugleiste zeigt den Zustand). Einfacher Klick springt
+hin, Doppelklick auf einen Comic öffnet ihn. Reihenfolge per Ziehen. Über das
+Rechtsklickmenü lassen sich Favoriten umbenennen (ein eigener Anzeigename statt
+des Dateinamens) und verschwundene aufräumen — fehlende stehen bis dahin grau
+und kursiv da. Umbenannte oder verschobene Dateien zieht ComicDesk automatisch
+nach. Gespeichert wird in `~/.local/share/comicdesk/favorites.json`.
+
+**Sitzung** — zuletzt besuchtes Verzeichnis, Fenstergröße und Teilerpositionen
+werden beim Beenden gemerkt. Ein Pfad als Startargument (`./comicdesk.sh ~/X`)
+hat Vorrang und überschreibt das gemerkte Verzeichnis für diesen Start.
+
+**Browsen** — Ordnerbaum links, Cover-Kacheln in der Mitte. Thumbnails werden
+im Hintergrund erzeugt und in `~/.cache/comicdesk/thumbs` zwischengespeichert.
+Filterfeld oben rechts filtert nach Dateiname.
+
+**Lesen** — Doppelklick oder Enter öffnet den Reader.
+
+| Taste | Funktion |
+|---|---|
+| ←/Bild↑/Rücktaste | zurück |
+| →/Bild↓/Leertaste | weiter |
+| Pos1 / Ende | erste / letzte Seite |
+| 1 / 2 / 3 | ganze Seite / Breite / 100 % |
+| F11 | Vollbild |
+| Esc | schließen |
+
+**Seiten verwalten** (`Strg+P`) — *Extras → Seiten verwalten …*, oder direkt aus
+dem Reader. Zeigt alle Seiten als Raster: mit der Maus ziehen zum Umsortieren,
+`Entf` zum Löschen, `Strg+Z` macht rückgängig. Geschrieben wird erst mit
+`Strg+S` nach Rückfrage — bis dahin bleibt die Datei unangetastet. Die Seiten
+werden dabei fortlaufend neu nummeriert; `ComicInfo.xml`, freie Tags und
+sonstige Dateien im Archiv bleiben erhalten, `PageCount` wird angepasst.
+
+Das geht bei **CBZ** und **PDF**. CBR/CB7/CBT sind schreibgeschützt — erst
+„Nach CBZ konvertieren".
+
+**Taggen** — rechte Seitenleiste, schreibt `ComicInfo.xml` ins Archiv
+(Standardformat, das auch Komet, Kavita, Komga, ComicRack und ComicTagger lesen).
+Freie Tags landen im `<Tags>`-Element. `Strg+S` speichert.
+
+**Sammlung durchsuchen** (`Strg+F`) — Umschalter „Sammlung" neben dem
+Filterfeld. Sucht über alle indizierten Ordner hinweg, nicht nur im aktuellen.
+Siehe unten. `Strg+G` springt vom Suchtreffer in dessen Ordner.
+
+**Einstellungen** (`Strg+,`) — unter *Extras → Einstellungen …*. Zwei Reiter:
+**Metadaten-Quellen** (ComicVine-API-Key, GCD-Dump, Schwellwert) und
+**Allgemein** (Sprache: Deutsch, English, Automatisch). Die Sprachumstellung
+greift sofort.
+
+**Bedienung** — Menüleiste mit allen Befehlen (Datei, Bearbeiten, Ansicht,
+Extras, Hilfe); die Werkzeugleiste zeigt nur die sechs ständig gebrauchten
+Aktionen. Rechtsklick auf eine Datei bietet alle Dateibefehle.
+
+**Automatisch taggen** (`Strg+T`) — gleicht die Auswahl (oder den ganzen Ordner,
+wenn nichts ausgewählt ist) gegen ComicVine und/oder die lokale GCD ab. Siehe
+unten.
+
+**Umbenennen nach Tags** (`Strg+R`) — Massen-Umbenennung nach Schema, z. B.
+`{series} #{issue} ({year}){title_dash}`. Platzhalter: `{series} {issue}
+{title} {title_dash} {year} {month} {volume} {publisher}`. Vorschau vor
+dem Ausführen, das Schema wird gemerkt.
+
+**Dateioperationen** — `F2` umbenennen, `Strg+C`/`Strg+X`/`Strg+V`,
+`Entf` (in den Papierkorb), `Strg+Umschalt+N` neuer Ordner. Die Kürzel gelten
+nur im Dateibereich, in den Metadatenfeldern funktionieren sie normal.
+
+## Formate
+
+| Format | Lesen | Tags schreiben | Seiten bearbeiten |
+|---|---|---|---|
+| CBZ / ZIP | ja | ja (ComicInfo.xml im Archiv) | ja |
+| CBR / CB7 | ja, via `7z` | nein → „Nach CBZ konvertieren“ | nein |
+| CBT | ja | nein → „Nach CBZ konvertieren“ | nein |
+| PDF | ja, via PyMuPDF | ja (`datei.pdf.ComicInfo.xml` daneben) | ja |
+
+„Nach CBZ konvertieren“ erzeugt eine CBZ-Kopie und lässt das Original liegen.
+
+Für CBR/CB7 wird das `7z`-Kommando gebraucht:
+`sudo apt install p7zip-full p7zip-rar`.
+
+## Sammlung durchsuchen
+
+Erst unter „Einstellungen → Sammlung indizieren …" die Ordner festlegen und
+einlesen lassen. Der Index liegt in `~/.local/share/comicdesk/index.sqlite` und
+ist reiner Cache — er lässt sich jederzeit neu aufbauen, Quelle der Wahrheit
+bleibt das ComicInfo.xml in der Datei. Ein zweiter Lauf liest nur geänderte
+Dateien neu; verschwundene Einträge fliegen raus. Tag-Änderungen im Panel und
+Auto-Tag-Läufe aktualisieren den Index sofort, ohne neuen Scan.
+
+Suchsyntax — Feldsuchen und freier Text lassen sich mischen:
+
+| Beispiel | Wirkung |
+|---|---|
+| `joker` | Volltext über alle Felder |
+| `serie:batman` | Serienname enthält „batman" |
+| `jahr:1975` / `jahr:1990-1999` | Jahr exakt oder Zeitraum |
+| `verlag:ehapa` | Verlag |
+| `tag:gotham` | freies Tag |
+| `autor:gottfredson` | beliebige mitwirkende Person |
+| `figur:joker` `team:` `ort:` | Charaktere, Teams, Orte |
+| `titel:"der grosse fall"` | Anführungszeichen für Mehrwortsuche |
+| `serie:batman jahr:2019 joker` | alles kombinierbar (UND) |
+
+Weitere Präfixe: `nummer:` `genre:` `sprache:` `imprint:` `arc:` `datei:`.
+Die englischen Namen (`series:` `year:` `publisher:` …) funktionieren ebenso.
+
+## Automatisches Taggen
+
+Konfiguration unter „Metadaten-Quellen …“. Beide Quellen können gleichzeitig
+aktiv sein; bewertet wird quellenübergreifend, der beste Treffer gewinnt.
+
+### ComicVine
+
+API-Key kostenlos nach Registrierung auf comicvine.gamespot.com/api. Limit sind
+200 Anfragen pro Stunde, deshalb wird auf ~1 Anfrage/Sekunde gedrosselt und
+jede Antwort dauerhaft in `~/.cache/comicdesk/comicvine.sqlite` gecacht (30 Tage).
+Liefert Cover-URLs — nur damit ist die Bild-Verifikation möglich.
+
+### GCD (lokal)
+
+Die Grand Comics Database hat keine öffentliche API, stellt aber alle zwei
+Wochen **SQLite3-Dumps** bereit: <https://www.comics.org/download/> (Account
+nötig, Daten unter CC-BY). Datei herunterladen, im Dialog auswählen, einmal
+**„Indizes anlegen“** drücken — der Dump kommt fast ohne Indizes und ist ohne
+sie sehr langsam.
+
+Offline, kein Limit, und deutlich besser bei europäischen Verlagen (Ehapa,
+Carlsen, Splitter, Bastei), die ComicVine kaum erfasst. Über „Nur Sprache“
+lassen sich z. B. ausschließlich deutsche Ausgaben berücksichtigen. Der Dump
+enthält keine Cover-URLs, hier gibt es also keinen Bildabgleich.
+
+### Bewertung
+
+Aus Dateiname und vorhandenen Tags wird eine Anfrage gebaut (Tags schlagen
+Dateinamen). Jeder Kandidat bekommt einen Score aus gewichteten Signalen:
+
+| Signal | Gewicht | Anmerkung |
+|---|---|---|
+| Serienname | 45 | Ähnlichkeit, nicht Gleichheit |
+| Heftnummer | 20 | Abweichung disqualifiziert sofort |
+| Jahr | 25 | ±1 Jahr zählt teilweise |
+| Verlag | 10 | |
+| Cover-Bildvergleich | 40 | nur ComicVine |
+
+Signale, für die Daten fehlen, fallen samt Gewicht heraus — ein Treffer ohne
+Cover steht dadurch nicht automatisch schlechter da. Geschrieben wird nur ab
+dem eingestellten Schwellwert (Standard 80), alles darunter erscheint als
+„unsicher“ im Protokoll, **ohne die Datei anzufassen**. Dateien, die schon Tags
+haben, werden standardmäßig übersprungen.
+
+Neue Werte werden über die vorhandenen gelegt, nicht ersetzt: Felder, die die
+Quelle nicht füllt, und deine eigenen freien Tags bleiben erhalten.
+
+## Aufbau
+
+- `comicdesk/archive.py` – Archiv- und Metadaten-Ebene (bewusst ohne comicapi's
+  RAR-Backend, das `unrar` bräuchte; ComicInfo-Mapping kommt von `comicapi`)
+- `comicdesk/thumbs.py` – Cover-Thumbnails im Threadpool, Platten-Cache
+- `comicdesk/mainwindow.py` – Browser, Kachel-Delegate, Dateioperationen
+- `comicdesk/reader.py` – Lesefenster
+- `comicdesk/metapanel.py` – Tag-Editor
+- `comicdesk/pageeditor.py` – Seiten löschen und umsortieren
+- `comicdesk/favorites.py` – Favoritenliste (JSON)
+- `comicdesk/providers/` – Metadaten-Quellen hinter einer gemeinsamen
+  Schnittstelle (`base.py`), aktuell `comicvine.py` und `gcd.py`
+- `comicdesk/autotag.py` – Bewertung und Batch-Lauf im Hintergrund-Thread
+- `comicdesk/autotagdialog.py` – Quellen-Einstellungen und Lauf-Protokoll
+- `comicdesk/index.py` – Sammlungs-Index (SQLite + FTS5) und Suchsyntax
+- `comicdesk/indexdialog.py` – Ordnerauswahl und Scan-Fortschritt
+- `comicdesk/i18n.py` – Übersetzungstabellen
+- `comicdesk/icons.py` – selbst gezeichnete SVG-Icons (Theme-unabhängig)
+
+Neue Sprache: in `i18n.py` ein Dict nach dem Muster von `EN` anlegen und in
+`LANGUAGES` und `TABLE` eintragen. Schlüssel sind die deutschen Quelltext-
+Strings; fehlt ein Eintrag, erscheint der Schlüssel — die App bleibt nutzbar.
+
+Eine weitere Quelle anzubinden heißt: `MetadataProvider` ableiten, `available`,
+`search` und `enrich` implementieren, in `config.py` eintragen.
+
+## Bekannte Grenzen
+
+- **Keine automatisierte Testsuite.** Alles wurde manuell und mit
+  Wegwerf-Skripten geprüft.
+- **ComicVine ist nie live gelaufen** — nur gegen nachgebaute API-Antworten.
+  Feldnamen und Rollen-Mapping stimmen, das reale Verhalten unter Rate-Limit
+  ist ungeprüft.
+- **GCD ist nie gegen einen echten Dump gelaufen**, nur gegen eine
+  synthetische Datenbank mit dem echten Schema. Die Seriensuche nutzt
+  `LIKE '%…%'` und dürfte bei ~150.000 Serien zu langsam sein; nötig wäre eine
+  FTS5-Volltexttabelle.
+- **Nur unter Linux getestet.**
+- Reader ohne Lesefortschritt, Doppelseiten und Manga-Leserichtung.
+- Tags nur einzeln editierbar, kein Batch-Editor.
+- Kein Drag & Drop aus anderen Dateimanagern.
+
+## Lizenz
+
+[MIT](LICENSE).
+
+Verwendet [PySide6](https://doc.qt.io/qtforpython/) (LGPL),
+[comicapi/ComicTagger](https://github.com/comictagger/comictagger) (Apache-2.0),
+[PyMuPDF](https://pymupdf.readthedocs.io/) (AGPL/kommerziell) und
+[Send2Trash](https://github.com/arsenetar/send2trash) (BSD).
+Metadaten stammen von [ComicVine](https://comicvine.gamespot.com/api/) und der
+[Grand Comics Database](https://www.comics.org/) (Daten CC-BY).

@@ -1,0 +1,501 @@
+"""Sprachumschaltung.
+
+Die Quelltext-Strings sind zugleich die Schluessel. Sie sind ASCII-Deutsch
+gehalten, damit sie robust als Schluessel taugen; die Tabelle liefert fuer
+`de` das korrekt umlautete Deutsch und fuer `en` die Uebersetzung. Fehlt ein
+Eintrag, wird der Schluessel selbst angezeigt - die App bleibt also immer
+benutzbar, auch wenn eine Uebersetzung vergessen wurde.
+"""
+from __future__ import annotations
+
+#: Code -> Anzeigename im Menue.
+LANGUAGES = {"auto": "Automatisch", "de": "Deutsch", "en": "English"}
+
+_current = "de"
+
+
+def system_language() -> str:
+    from PySide6.QtCore import QLocale
+
+    code = QLocale.system().name().split("_")[0].lower()
+    return code if code in ("de", "en") else "en"
+
+
+def set_language(code: str) -> None:
+    global _current
+    _current = system_language() if code == "auto" else (
+        code if code in ("de", "en") else "de")
+
+
+def language() -> str:
+    return _current
+
+
+def _(text: str) -> str:
+    """Uebersetzt `text` in die aktive Sprache."""
+    return TABLE.get(_current, {}).get(text, text)
+
+
+# ---------------------------------------------------------------------------
+DE = {
+    # Nur Eintraege, bei denen der ASCII-Schluessel Umlaute braucht.
+    "Loeschen": "Löschen",
+    "Einfuegen": "Einfügen",
+    "Nach oben": "Nach oben",
+    "◀ Zurueck": "◀ Zurück",
+    "Schliessen": "Schließen",
+    "Metadaten-Quellen …": "Metadaten-Quellen …",
+    "Keine Datei ausgewaehlt": "Keine Datei ausgewählt",
+    "Waehlen …": "Wählen …",
+    "Ordner hinzufuegen …": "Ordner hinzufügen …",
+    "Ordner waehlen": "Ordner wählen",
+    "GCD-SQLite-Dump waehlen": "GCD-SQLite-Dump wählen",
+    "Bitte genau einen Eintrag waehlen.": "Bitte genau einen Eintrag wählen.",
+    "Bitte mindestens einen Ordner hinzufuegen.":
+        "Bitte mindestens einen Ordner hinzufügen.",
+    "Keine konvertierbaren Dateien gewaehlt.":
+        "Keine konvertierbaren Dateien gewählt.",
+    "Umbenennen bestaetigen": "Umbenennen bestätigen",
+    "Alles neu einlesen (sonst nur geaenderte Dateien)":
+        "Alles neu einlesen (sonst nur geänderte Dateien)",
+    "Einmalig ausfuehren - beschleunigt die Suche erheblich.":
+        "Einmalig ausführen – beschleunigt die Suche erheblich.",
+    "Laedt ...": "Lädt …",
+    "Suche Dateien …": "Suche Dateien …",
+    "Wird beendet …": "Wird beendet …",
+    "Wird nach der laufenden Datei beendet …":
+        "Wird nach der laufenden Datei beendet …",
+    "uebersprungen": "übersprungen",
+    "Hat bereits Tags.": "Hat bereits Tags.",
+    "Format nicht beschreibbar - erst nach CBZ konvertieren.":
+        "Format nicht beschreibbar – erst nach CBZ konvertieren.",
+    "Serienname weder in Tags noch im Dateinamen erkennbar.":
+        "Serienname weder in Tags noch im Dateinamen erkennbar.",
+    "Kostenlos nach Registrierung. Limit 200 Anfragen/Stunde, deshalb wird "
+    "gedrosselt und dauerhaft gecacht. Liefert Cover, damit ist die "
+    "Bild-Verifikation moeglich.":
+        "Kostenlos nach Registrierung. Limit 200 Anfragen/Stunde, deshalb wird "
+        "gedrosselt und dauerhaft gecacht. Liefert Cover, damit ist die "
+        "Bild-Verifikation möglich.",
+    "SQLite3-Dump von comics.org/download (Account noetig, Daten CC-BY). "
+    "Offline und ohne Limit, stark bei europaeischen Verlagen. Enthaelt keine "
+    "Cover, daher kein Bildabgleich.":
+        "SQLite3-Dump von comics.org/download (Account nötig, Daten CC-BY). "
+        "Offline und ohne Limit, stark bei europäischen Verlagen. Enthält "
+        "keine Cover, daher kein Bildabgleich.",
+    "Nur Treffer ab diesem Wert werden geschrieben. Alles darunter landet als "
+    "„unsicher“ im Protokoll, ohne die Datei zu aendern.":
+        "Nur Treffer ab diesem Wert werden geschrieben. Alles darunter landet "
+        "als „unsicher“ im Protokoll, ohne die Datei zu ändern.",
+    "Es ist keine Quelle konfiguriert. Unter „Quellen …“ einen "
+    "ComicVine-API-Key eintragen oder einen GCD-Dump auswaehlen.":
+        "Es ist keine Quelle konfiguriert. Unter „Quellen …“ einen "
+        "ComicVine-API-Key eintragen oder einen GCD-Dump auswählen.",
+    "Schreiben in dieses Format ist nicht moeglich. Ueber „Nach CBZ "
+    "konvertieren“ taggbar machen.":
+        "Schreiben in dieses Format ist nicht möglich. Über „Nach CBZ "
+        "konvertieren“ taggbar machen.",
+    "Metadaten koennen in {suffix} nicht geschrieben werden. Datei zuerst "
+    "nach CBZ konvertieren.":
+        "Metadaten können in {suffix} nicht geschrieben werden. Datei zuerst "
+        "nach CBZ konvertieren.",
+    "Nicht unterstuetztes Format: {suffix}":
+        "Nicht unterstütztes Format: {suffix}",
+    "7z ist nicht installiert - CBR/CB7 koennen nicht gelesen werden.\n"
+    "Installation: sudo apt install p7zip-full p7zip-rar":
+        "7z ist nicht installiert – CBR/CB7 können nicht gelesen werden.\n"
+        "Installation: sudo apt install p7zip-full p7zip-rar",
+    "7z konnte {name} nicht entpacken:\n{error}":
+        "7z konnte {name} nicht entpacken:\n{error}",
+    "{count} Eintrag/Eintraege in den Papierkorb verschieben?\n\n{names}{more}":
+        "{count} Einträge in den Papierkorb verschieben?\n\n{names}{more}",
+    "Fertig: {updated} eingelesen, {skipped} unveraendert, {removed} "
+    "verschwundene entfernt. {stats}":
+        "Fertig: {updated} eingelesen, {skipped} unverändert, {removed} "
+        "verschwundene entfernt. {stats}",
+    "Schema – verfuegbar: {series} {issue} {title} {title_dash} {year} "
+    "{month} {volume} {publisher}":
+        "Schema – verfügbar: {series} {issue} {title} {title_dash} {year} "
+        "{month} {volume} {publisher}",
+    "Statt im aktuellen Ordner in der gesamten indizierten Sammlung suchen "
+    "(Strg+F)":
+        "Statt im aktuellen Ordner in der gesamten indizierten Sammlung "
+        "suchen (Strg+F)",
+    "Suchmodus – der Index ist noch leer. Erst „Sammlung indizieren …“ "
+    "ausfuehren.":
+        "Suchmodus – der Index ist noch leer. Erst „Sammlung indizieren …“ "
+        "ausführen.",
+    "Seiten koennen in {suffix} nicht bearbeitet werden. Datei zuerst nach "
+    "CBZ konvertieren.":
+        "Seiten können in {suffix} nicht bearbeitet werden. Datei zuerst nach "
+        "CBZ konvertieren.",
+    "Seiten loeschen": "Seiten löschen",
+    "Rueckgaengig": "Rückgängig",
+    "{count} werden geloescht": "{count} werden gelöscht",
+    "Reihenfolge geaendert": "Reihenfolge geändert",
+    "Diese Datei ist nicht bearbeitbar – erst nach CBZ konvertieren.":
+        "Diese Datei ist nicht bearbeitbar – erst nach CBZ konvertieren.",
+    "{count} Seite(n) werden dauerhaft aus der Datei entfernt. Fortfahren?":
+        "{count} Seite(n) werden dauerhaft aus der Datei entfernt. Fortfahren?",
+    "Seiten verwalten …": "Seiten verwalten …",
+    "Zu Favoriten hinzufuegen": "Zu Favoriten hinzufügen",
+    "Verschwundene Favoriten aufraeumen": "Verschwundene Favoriten aufräumen",
+    "„{name}“ zu den Favoriten hinzugefuegt.":
+        "„{name}“ zu den Favoriten hinzugefügt.",
+    "Ueber ComicDesk": "Über ComicDesk",
+    "Sprache": "Sprache",
+    "Einstellungen …": "Einstellungen …",
+    "ComicDesk – ein Dateimanager nur fuer Comics.\n\n"
+    "Browsen, lesen, taggen und ordnen von CBZ, CBR, CB7, CBT und PDF. "
+    "Tags werden als ComicInfo.xml geschrieben.\n\n"
+    "Metadaten von ComicVine und der Grand Comics Database.":
+        "ComicDesk – ein Dateimanager nur für Comics.\n\n"
+        "Browsen, lesen, taggen und ordnen von CBZ, CBR, CB7, CBT und PDF. "
+        "Tags werden als ComicInfo.xml geschrieben.\n\n"
+        "Metadaten von ComicVine und der Grand Comics Database.",
+    "Nichts umzubenennen ({count} ohne brauchbare Tags).":
+        "Nichts umzubenennen ({count} ohne brauchbare Tags).",
+    "Konnte nicht gelesen werden: {error}":
+        "Konnte nicht gelesen werden: {error}",
+}
+
+EN = {
+    # --- Werkzeugleiste, Aktionen
+    "Automatisch": "Automatic",
+    "Nach oben": "Up",
+    "Aktualisieren": "Refresh",
+    "Suchen": "Search",
+    "Ordner anzeigen": "Show folder",
+    "Lesen": "Read",
+    "Umbenennen": "Rename",
+    "Nach Tags benennen": "Rename from tags",
+    "Automatisch taggen": "Auto-tag",
+    "Kopieren": "Copy",
+    "Ausschneiden": "Cut",
+    "Einfuegen": "Paste",
+    "Loeschen": "Delete",
+    "Neuer Ordner": "New folder",
+    "Nach CBZ konvertieren": "Convert to CBZ",
+    "Sammlung indizieren …": "Index collection …",
+    "Metadaten-Quellen …": "Metadata sources …",
+    "Aktionen": "Actions",
+    "Sammlung": "Collection",
+    "Ordner:": "Folder:",
+    "Bereit": "Ready",
+    "Bereit.": "Ready.",
+    "Sprache": "Language",
+    "Einstellungen": "Settings",
+    "Einstellungen …": "Settings …",
+    "&Datei": "&File",
+    "&Bearbeiten": "&Edit",
+    "&Ansicht": "&View",
+    "E&xtras": "&Tools",
+    "&Hilfe": "&Help",
+    "Beenden": "Quit",
+    "In der Sammlung suchen": "Search the collection",
+    "Allgemein": "General",
+    "Metadaten-Quellen": "Metadata sources",
+    "„Automatisch“ folgt der Systemsprache. Die Umstellung greift sofort, "
+    "das Fenster wird dabei neu aufgebaut.":
+        "“Automatic” follows the system language. The change takes effect "
+        "immediately; the window is rebuilt.",
+    "ComicDesk – ein Dateimanager nur fuer Comics.\n\n"
+    "Browsen, lesen, taggen und ordnen von CBZ, CBR, CB7, CBT und PDF. "
+    "Tags werden als ComicInfo.xml geschrieben.\n\n"
+    "Metadaten von ComicVine und der Grand Comics Database.":
+        "ComicDesk – a file manager just for comics.\n\n"
+        "Browse, read, tag and organise CBZ, CBR, CB7, CBT and PDF. Tags are "
+        "written as ComicInfo.xml.\n\n"
+        "Metadata from ComicVine and the Grand Comics Database.",
+    "Ueber ComicDesk": "About ComicDesk",
+
+    # --- Seiten verwalten
+    "Seiten verwalten": "Manage pages",
+    "Seiten verwalten …": "Manage pages …",
+    "Seiten verwalten – {name}": "Manage pages – {name}",
+    "Seiten loeschen": "Delete pages",
+    "Nach vorne": "Move earlier",
+    "Nach hinten": "Move later",
+    "An den Anfang": "Move to start",
+    "Ans Ende": "Move to end",
+    "Rueckgaengig": "Undo",
+    "Speichern": "Save",
+    "Seiten speichern": "Save pages",
+    "Seiten gespeichert.": "Pages saved.",
+    "{count} Seiten": "{count} pages",
+    "{count} werden geloescht": "{count} to be deleted",
+    "Reihenfolge geaendert": "order changed",
+    "Diese Datei ist nicht bearbeitbar – erst nach CBZ konvertieren.":
+        "This file cannot be edited – convert to CBZ first.",
+    "{count} Seite(n) werden dauerhaft aus der Datei entfernt. Fortfahren?":
+        "{count} page(s) will be permanently removed from the file. Continue?",
+    "Neue Seitenreihenfolge in die Datei schreiben?":
+        "Write the new page order to the file?",
+    "Ein Comic braucht mindestens eine Seite.":
+        "A comic needs at least one page.",
+    "Seiten koennen in {suffix} nicht bearbeitet werden. Datei zuerst nach "
+    "CBZ konvertieren.":
+        "Pages cannot be edited in {suffix}. Convert the file to CBZ first.",
+
+    # --- Favoriten
+    "Favoriten": "Favourites",
+    "Zu Favoriten hinzufuegen": "Add to favourites",
+    "Aus Favoriten entfernen": "Remove from favourites",
+    "Favorit umbenennen": "Rename favourite",
+    "Verschwundene Favoriten aufraeumen": "Clean up missing favourites",
+    "Anzeigename:": "Display name:",
+    "„{name}“ zu den Favoriten hinzugefuegt.":
+        "“{name}” added to favourites.",
+    "„{name}“ aus den Favoriten entfernt.":
+        "“{name}” removed from favourites.",
+    "{count} verschwundene Favoriten entfernt.":
+        "{count} missing favourites removed.",
+
+    # --- Reader
+    "Reader": "Reader",
+    "◀ Zurueck": "◀ Back",
+    "Weiter ▶": "Next ▶",
+    "Ganze Seite": "Whole page",
+    "Breite": "Fit width",
+    "100 %": "100 %",
+    "Vollbild": "Fullscreen",
+    "Schliessen": "Close",
+    "Erste Seite": "First page",
+    "Letzte Seite": "Last page",
+    "Laedt ...": "Loading …",
+    "Keine Seiten gefunden.": "No pages found.",
+    "Bild konnte nicht dekodiert werden.": "Could not decode image.",
+    "Seite {index} / {total}  –  {name}": "Page {index} / {total}  –  {name}",
+    "Seite {index} konnte nicht geladen werden:\n{error}":
+        "Page {index} could not be loaded:\n{error}",
+
+    # --- Metadaten-Panel
+    "Heft": "Issue",
+    "Mitwirkende (mehrere mit Komma)": "Credits (separate with commas)",
+    "Listen (Komma-getrennt)": "Lists (comma separated)",
+    "Beschreibung": "Summary",
+    "Tags speichern": "Save tags",
+    "Verwerfen": "Discard",
+    "Keine Datei ausgewaehlt": "No file selected",
+    "Tags": "Tags",
+    "Serie": "Series",
+    "Nummer": "Number",
+    "Titel": "Title",
+    "Volume": "Volume",
+    "Anzahl Hefte": "Issue count",
+    "Jahr": "Year",
+    "Monat": "Month",
+    "Tag": "Day",
+    "Verlag": "Publisher",
+    "Imprint": "Imprint",
+    "Genre": "Genre",
+    "Sprache (ISO)": "Language (ISO)",
+    "Format": "Format",
+    "Story Arc": "Story arc",
+    "Serien-Gruppe": "Series group",
+    "Altersfreigabe": "Age rating",
+    "Web-Link": "Web link",
+    "Scan-Info": "Scan info",
+    "Charaktere": "Characters",
+    "Teams": "Teams",
+    "Orte": "Locations",
+    "Autor": "Writer",
+    "Zeichner": "Penciller",
+    "Tusche": "Inker",
+    "Farben": "Colorist",
+    "Lettering": "Letterer",
+    "Cover": "Cover artist",
+    "Redaktion": "Editor",
+    "Tags gespeichert.": "Tags saved.",
+    "{name}\n{pages} Seiten": "{name}\n{pages} pages",
+    "Konnte nicht gelesen werden: {error}": "Could not be read: {error}",
+    "PDF: Tags landen in einer ComicInfo.xml-Datei daneben.":
+        "PDF: tags are stored in a ComicInfo.xml file next to it.",
+    "Schreiben in dieses Format ist nicht moeglich. Ueber „Nach CBZ "
+    "konvertieren“ taggbar machen.":
+        "This format cannot be written. Use “Convert to CBZ” to make it "
+        "taggable.",
+    "Fehlgeschlagen:\n{error}": "Failed:\n{error}",
+
+    # --- Dateioperationen
+    "Neuer Name:": "New name:",
+    "Name:": "Name:",
+    "Ordner": "Folder",
+    "Nicht gefunden: {path}": "Not found: {path}",
+    "{name} existiert bereits.": "{name} already exists.",
+    "Bitte genau einen Eintrag waehlen.": "Please select exactly one entry.",
+    "{count} kopiert.": "{count} copied.",
+    "{count} ausgeschnitten.": "{count} cut.",
+    "{count} Eintrag/Eintraege in den Papierkorb verschieben?\n\n{names}{more}":
+        "Move {count} item(s) to the trash?\n\n{names}{more}",
+    "{count} Datei(en) umbenennen?\n\n{preview}{more}":
+        "Rename {count} file(s)?\n\n{preview}{more}",
+    "Nichts umzubenennen ({count} ohne brauchbare Tags).":
+        "Nothing to rename ({count} without usable tags).",
+    "Schema – verfuegbar: {series} {issue} {title} {title_dash} {year} "
+    "{month} {volume} {publisher}":
+        "Pattern – available: {series} {issue} {title} {title_dash} {year} "
+        "{month} {volume} {publisher}",
+    "Umbenennen bestaetigen": "Confirm rename",
+    "Keine konvertierbaren Dateien gewaehlt.": "No convertible files selected.",
+    "{count} Datei(en) nach CBZ konvertieren? Die Originale bleiben erhalten.":
+        "Convert {count} file(s) to CBZ? The originals are kept.",
+    "Konvertieren": "Convert",
+    "und {count} weitere": "and {count} more",
+    "{comics} Comics, {dirs} Ordner in {path}":
+        "{comics} comics, {dirs} folders in {path}",
+    "Keine Comics zum Taggen.": "No comics to tag.",
+
+    # --- Suche / Index
+    "Filter (Dateiname) …": "Filter (file name) …",
+    "Sammlung durchsuchen – z. B. serie:batman jahr:1990-1999 joker":
+        "Search collection – e.g. series:batman year:1990-1999 joker",
+    "Statt im aktuellen Ordner in der gesamten indizierten Sammlung suchen "
+    "(Strg+F)":
+        "Search the whole indexed collection instead of the current folder "
+        "(Ctrl+F)",
+    "{hits} Treffer von {total} indizierten Comics":
+        "{hits} hits out of {total} indexed comics",
+    "Suche fehlgeschlagen: {error}": "Search failed: {error}",
+    "Suchmodus – {total} Comics im Index. Felder: {fields}":
+        "Search mode – {total} comics indexed. Fields: {fields}",
+    "Suchmodus – der Index ist noch leer. Erst „Sammlung indizieren …“ "
+    "ausfuehren.":
+        "Search mode – the index is still empty. Run “Index collection …” "
+        "first.",
+    "Sammlung indizieren": "Index collection",
+    "Diese Ordner werden rekursiv nach Comics durchsucht und ihre Tags in den "
+    "Suchindex geschrieben.":
+        "These folders are scanned recursively for comics and their tags are "
+        "written to the search index.",
+    "Ordner hinzufuegen …": "Add folder …",
+    "Entfernen": "Remove",
+    "Alles neu einlesen (sonst nur geaenderte Dateien)":
+        "Re-read everything (otherwise only changed files)",
+    "{count} Comics im Index.": "{count} comics indexed.",
+    "Ordner waehlen": "Choose folder",
+    "Kein Ordner": "No folder",
+    "Bitte mindestens einen Ordner hinzufuegen.":
+        "Please add at least one folder.",
+    "Indizieren": "Index",
+    "Suche Dateien …": "Looking for files …",
+    "Wird beendet …": "Stopping …",
+    "Fertig: {updated} eingelesen, {skipped} unveraendert, {removed} "
+    "verschwundene entfernt. {stats}":
+        "Done: {updated} read, {skipped} unchanged, {removed} missing "
+        "removed. {stats}",
+
+    # --- Auto-Tagging
+    "Automatisch taggen – {count} Datei(en)": "Auto-tag – {count} file(s)",
+    "Datei": "File",
+    "Status": "Status",
+    "Score": "Score",
+    "Quelle": "Source",
+    "Treffer": "Match",
+    "Anmerkung": "Note",
+    "Quellen …": "Sources …",
+    "Starten": "Start",
+    "Abbrechen": "Cancel",
+    "Wird nach der laufenden Datei beendet …":
+        "Stopping after the current file …",
+    "Fertig. {summary}": "Done. {summary}",
+    "Fertig.": "Done.",
+    "[{done}/{total}] {name}": "[{done}/{total}] {name}",
+    "getaggt": "tagged",
+    "unsicher": "uncertain",
+    "kein Treffer": "no match",
+    "uebersprungen": "skipped",
+    "Fehler": "Error",
+    "Hat bereits Tags.": "Already has tags.",
+    "Format nicht beschreibbar - erst nach CBZ konvertieren.":
+        "Format is not writable – convert to CBZ first.",
+    "Serienname weder in Tags noch im Dateinamen erkennbar.":
+        "No series name found in tags or file name.",
+    "unter Schwellwert {threshold}. {notes}":
+        "below threshold {threshold}. {notes}",
+    "Cover-Aehnlichkeit {value}": "cover similarity {value}",
+    "Keine Quelle": "No source",
+    "Keine Quelle nutzbar": "No usable source",
+    "Es ist keine Quelle konfiguriert. Unter „Quellen …“ einen "
+    "ComicVine-API-Key eintragen oder einen GCD-Dump auswaehlen.":
+        "No source is configured. Enter a ComicVine API key or select a GCD "
+        "dump under “Sources …”.",
+
+    # --- Quellen-Dialog
+    "Metadaten-Quellen": "Metadata sources",
+    "ComicVine": "ComicVine",
+    "ComicVine benutzen": "Use ComicVine",
+    "API-Key": "API key",
+    "API-Key von comicvine.gamespot.com/api":
+        "API key from comicvine.gamespot.com/api",
+    "Kostenlos nach Registrierung. Limit 200 Anfragen/Stunde, deshalb wird "
+    "gedrosselt und dauerhaft gecacht. Liefert Cover, damit ist die "
+    "Bild-Verifikation moeglich.":
+        "Free after registration. Limited to 200 requests per hour, so "
+        "requests are throttled and cached permanently. Provides covers, "
+        "which enables image verification.",
+    "Grand Comics Database (lokaler Dump)":
+        "Grand Comics Database (local dump)",
+    "GCD benutzen": "Use GCD",
+    "Datenbank": "Database",
+    "Pfad zur SQLite-Datei aus dem GCD-Dump":
+        "Path to the SQLite file from the GCD dump",
+    "Waehlen …": "Choose …",
+    "Indizes anlegen": "Create indexes",
+    "Einmalig ausfuehren - beschleunigt die Suche erheblich.":
+        "Run once – speeds up searching considerably.",
+    "Indizes sind angelegt.": "Indexes created.",
+    "Indizes fehlgeschlagen:\n{error}": "Creating indexes failed:\n{error}",
+    "Nur Sprache": "Language only",
+    "SQLite3-Dump von comics.org/download (Account noetig, Daten CC-BY). "
+    "Offline und ohne Limit, stark bei europaeischen Verlagen. Enthaelt keine "
+    "Cover, daher kein Bildabgleich.":
+        "SQLite3 dump from comics.org/download (account required, data "
+        "CC-BY). Offline and unlimited, strong on European publishers. "
+        "Contains no covers, so no image comparison.",
+    "Automatik": "Automation",
+    "Schwellwert": "Threshold",
+    "Treffer per Cover-Bildvergleich absichern (nur ComicVine, langsamer)":
+        "Verify matches by comparing covers (ComicVine only, slower)",
+    "Auch Dateien anfassen, die schon Tags haben":
+        "Also touch files that already have tags",
+    "Nur Treffer ab diesem Wert werden geschrieben. Alles darunter landet als "
+    "„unsicher“ im Protokoll, ohne die Datei zu aendern.":
+        "Only matches at or above this value are written. Anything below is "
+        "logged as “uncertain” without changing the file.",
+    "GCD": "GCD",
+    "GCD-SQLite-Dump waehlen": "Choose GCD SQLite dump",
+    "SQLite-Datenbank (*.db *.sqlite *.sqlite3 *.gcd);;Alle Dateien (*)":
+        "SQLite database (*.db *.sqlite *.sqlite3 *.gcd);;All files (*)",
+    "Alle Sprachen": "All languages",
+    "Deutsch": "German",
+    "Englisch": "English",
+    "Franzoesisch": "French",
+    "Italienisch": "Italian",
+    "Spanisch": "Spanish",
+    "Niederlaendisch": "Dutch",
+    "Kein ComicVine-API-Key hinterlegt.": "No ComicVine API key configured.",
+    "Kein Pfad zum GCD-Dump hinterlegt.": "No path to a GCD dump configured.",
+    "GCD-Dump nicht gefunden: {path}": "GCD dump not found: {path}",
+    "GCD-Dump nicht lesbar: {error}": "GCD dump not readable: {error}",
+
+    # --- Archiv-Fehler
+    "Metadaten koennen in {suffix} nicht geschrieben werden. Datei zuerst "
+    "nach CBZ konvertieren.":
+        "Metadata cannot be written to {suffix}. Convert the file to CBZ "
+        "first.",
+    "Nicht unterstuetztes Format: {suffix}": "Unsupported format: {suffix}",
+    "7z ist nicht installiert - CBR/CB7 koennen nicht gelesen werden.\n"
+    "Installation: sudo apt install p7zip-full p7zip-rar":
+        "7z is not installed – CBR/CB7 cannot be read.\n"
+        "Install with: sudo apt install p7zip-full p7zip-rar",
+    "7z konnte {name} nicht entpacken:\n{error}":
+        "7z could not extract {name}:\n{error}",
+    "{name} existiert bereits.": "{name} already exists.",
+    "ComicVine-Kontingent erschoepft (200 Anfragen/Stunde). Spaeter "
+    "weitermachen - bereits geholte Daten sind gecacht.":
+        "ComicVine quota exhausted (200 requests per hour). Continue later – "
+        "data already fetched is cached.",
+}
+
+TABLE = {"de": DE, "en": EN}
