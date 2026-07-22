@@ -113,14 +113,17 @@ class MatchDialog(QDialog):
         self.series = QLineEdit()
         self.issue = QLineEdit()
         self.year = QLineEdit()
+        self.title = QLineEdit()
+        self.title.setPlaceholderText(_("z. B. Gefährliche Heimkehr"))
         for label, widget in ((_("Serie"), self.series), (_("Nummer"), self.issue),
-                              (_("Jahr"), self.year)):
+                              (_("Jahr"), self.year), (_("Titel"), self.title)):
             widget.returnPressed.connect(self.search)
             form.addRow(label, widget)
         hinweis = QLabel(_(
             "Die Begriffe stammen aus den Tags oder dem Dateinamen. Passt der "
             "Treffer nicht, liegt es meist daran – korrigieren und erneut "
-            "suchen."))
+            "suchen. Gibt es einen Serienname mehrfach, hilft der Bandtitel "
+            "am ehesten weiter."))
         hinweis.setWordWrap(True)
         hinweis.setStyleSheet("color:gray;")
         form.addRow(hinweis)
@@ -195,12 +198,14 @@ class MatchDialog(QDialog):
             self.series.setText(query.series or "")
             self.issue.setText(query.issue or "")
             self.year.setText(str(query.year) if query.year else "")
+            self.title.setText(query.title or "")
 
     def _query(self) -> SearchQuery:
         jahr = self.year.text().strip()
         return SearchQuery(
             series=self.series.text().strip(),
             issue=self.issue.text().strip() or None,
+            title=self.title.text().strip() or None,
             year=int(jahr) if jahr.isdigit() else None,
             publisher=None,
             cover=self.cover_data,

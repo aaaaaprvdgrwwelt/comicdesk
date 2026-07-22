@@ -232,29 +232,64 @@ class GcdProvider(MetadataProvider):
         sql += "LIMIT 60"
         series_rows = con.execute(sql, params).fetchall()
 
+        if query.title:
+            # Reihen mit passendem Bandtitel nach vorn. Ohne das faellt die
+            # richtige Reihe durch die Ergebnisgrenze, sobald es den
+            # Serienname mehrfach gibt - genau dann hilft der Titel aber.
+            treffer = self._series_with_title(con, [r["id"] for r in series_rows],
+                                              query.title)
+            if treffer:
+                series_rows.sort(key=lambda r: r["id"] not in treffer)
         candidates: list[Candidate] = []
         wanted = normalize_issue(query.issue) if query.issue else None
         for series in series_rows:
-            for issue in self._issues(con, series["id"], wanted):
+            for issue in self._issues(con, series["id"], wanted, query.title):
                 candidates.append(self._to_candidate(series, issue))
                 if len(candidates) >= limit:
                     return candidates
         return candidates
 
-    def _issues(self, con, series_id: int, wanted: str | None) -> list[sqlite3.Row]:
-        columns = "id, number, key_date, title, volume, rating"
+    def _series_with_title(self, con, series_ids: list[int],
+                           title: str) -> set[int]:
+        if not series_ids:
+            return set()
+        platzhalter = ",".join("?" * len(series_ids))
+        muster = f"%{title}%"
+        rows = con.execute(
+            "SELECT DISTINCT i.series_id FROM gcd_issue i "  # noqa: S608
+            "LEFT JOIN gcd_story st ON st.issue_id = i.id "
+            f"WHERE i.series_id IN ({platzhalter}) "
+            "AND (i.title LIKE ? OR st.title LIKE ?)",
+            [*series_ids, muster, muster]).fetchall()
+        return {r[0] for r in rows}
+
+    def _issues(self, con, series_id: int, wanted: str | None,
+                title: str | None = None) -> list[sqlite3.Row]:
+        columns = "i.id, i.number, i.key_date, i.title, i.volume, i.rating"
+        if title:
+            # Nach Bandtitel suchen - bei mehreren gleichnamigen Reihen ist das
+            # oft das Einzige, was die richtige Ausgabe verraet. Der Titel steht
+            # meist nicht am Heft, sondern an der Hauptgeschichte.
+            rows = con.execute(
+                f"SELECT DISTINCT {columns}, st.title AS story_title "  # noqa: S608
+                "FROM gcd_issue i LEFT JOIN gcd_story st ON st.issue_id = i.id "
+                "WHERE i.series_id = ? AND i.variant_of_id IS NULL "
+                "AND (i.title LIKE ? OR st.title LIKE ?) LIMIT 20",
+                (series_id, f"%{title}%", f"%{title}%")).fetchall()
+            if rows:
+                return rows
         if wanted is None:
             return con.execute(
-                f"SELECT {columns} FROM gcd_issue "  # noqa: S608
-                "WHERE series_id = ? AND variant_of_id IS NULL LIMIT 20",
+                f"SELECT {columns} FROM gcd_issue i "  # noqa: S608
+                "WHERE i.series_id = ? AND i.variant_of_id IS NULL LIMIT 20",
                 (series_id,)).fetchall()
         # Grob in SQL vorfiltern (Serien koennen tausende Hefte haben), dann
         # exakt vergleichen - "007", "#7" und "7" sollen dasselbe treffen.
         # [nn] muss mit durch, sonst faellt jedes Einzelalbum heraus.
         rows = con.execute(
-            f"SELECT {columns} FROM gcd_issue "  # noqa: S608
-            "WHERE series_id = ? AND variant_of_id IS NULL "
-            "AND (number = ? OR number LIKE ? OR number = ?)",
+            f"SELECT {columns} FROM gcd_issue i "  # noqa: S608
+            "WHERE i.series_id = ? AND i.variant_of_id IS NULL "
+            "AND (i.number = ? OR i.number LIKE ? OR i.number = ?) LIMIT 40",
             (series_id, wanted, f"%{wanted}%", NO_NUMBER)).fetchall()
         return [r for r in rows if _issue_matches(r["number"], wanted)]
 
@@ -265,7 +300,11 @@ class GcdProvider(MetadataProvider):
         if nummer == NO_NUMBER:
             nummer = "1"   # nummernloses Album - lokal heisst das ueblich 1
         md.issue = nummer or None
-        md.title = (issue["title"] or "").strip() or None
+        titel = (issue["title"] or "").strip()
+        if not titel and "story_title" in issue.keys():
+            # Ueber den Bandtitel gefunden - der steht an der Geschichte.
+            titel = (issue["story_title"] or "").strip()
+        md.title = titel or None
         md.publisher = series["publisher"]
         md.issue_count = series["issue_count"]
         md.language = series["language_iso"]

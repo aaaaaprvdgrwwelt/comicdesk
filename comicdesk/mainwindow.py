@@ -799,6 +799,10 @@ class MainWindow(QMainWindow):
         paths = [p for p in self.selected_paths() if p.is_file()]
         self.meta.load(paths[0] if len(paths) == 1 else None)
 
+    @staticmethod
+    def _under(path: Path, base: Path) -> bool:
+        return path == base or str(path).startswith(str(base) + "/")
+
     def _tree_menu(self, pos) -> None:
         """Kontextmenue fuer den rechtsgeklickten Ordner - nicht fuer den
         gerade ausgewaehlten."""
@@ -835,9 +839,20 @@ class MainWindow(QMainWindow):
         add("In Sammlung verschieben …",
             lambda: self.move_to_collection(folder), "folder")
         add("Neuer Ordner …", lambda: self._new_folder_in(folder), "folder_new")
+        add("Umbenennen …", lambda: self._rename_folder(folder, index), "rename")
         menu.addSeparator()
         add("Aktualisieren", lambda: self._reload_tree(index), "refresh")
         return menu
+
+    def _rename_folder(self, folder: Path, index: QModelIndex) -> None:
+        name, ok = QInputDialog.getText(
+            self, _("Umbenennen"), _("Neuer Name:"), QLineEdit.Normal, folder.name)
+        name = name.strip()
+        if not ok or not name or name == folder.name:
+            return
+        parent = index.parent()
+        if self._do_rename(folder, folder.parent / name):
+            self._reload_tree(parent if parent.isValid() else index)
 
     def _set_favorite(self, folder: Path, add: bool) -> None:
         if add:
@@ -932,17 +947,29 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, _("Umbenennen"),
                                 _("{name} existiert bereits.").format(name=new.name))
             return False
+        war_ordner = old.is_dir()
+        innen = war_ordner and self._under(self.current_dir, old)
         try:
             old.rename(new)
         except OSError as exc:
             QMessageBox.critical(self, _("Umbenennen"), str(exc))
             return False
-        self._deindex(old)
-        self._reindex(new)
+        if war_ordner:
+            # Ein Ordner enthaelt viele indizierte Dateien. Die haengen alle am
+            # alten Pfad und waeren nach dem Umbenennen Karteileichen.
+            try:
+                self.index.move_paths(old, new, self.index.collection_for(new))
+            except Exception:  # noqa: BLE001
+                pass
+        else:
+            self._deindex(old)
+            self._reindex(new)
         self.favorites.move_path(old, new)
         self.refresh_favorites()
         self.refresh_collections()
         self.reload_tree_roots()
+        if innen:
+            self.set_directory(Path(str(new) + str(self.current_dir)[len(str(old)):]))
         return True
 
     def rename_by_template(self) -> None:

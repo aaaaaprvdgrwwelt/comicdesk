@@ -23,6 +23,7 @@ DEFAULT_THRESHOLD = 80
 W_SERIES = 45
 W_ISSUE = 20
 W_YEAR = 25
+W_TITLE = 35
 W_PUBLISHER = 10
 W_COVER = 40
 
@@ -99,6 +100,13 @@ def score_candidate(query: SearchQuery, candidate: Candidate,
     if query.year and candidate.year:
         delta = abs(query.year - candidate.year)
         parts.append((W_YEAR, 1.0 if delta == 0 else 0.6 if delta == 1 else 0.0))
+    if query.title:
+        # Wer einen Bandtitel angibt, meint ihn. Ausgaben ohne Titel duerfen
+        # dann nicht mit voller Punktzahl davonkommen, sonst gewinnt weiter
+        # die namensgleiche Reihe ohne den gesuchten Band.
+        eigener = candidate.metadata.title or ""
+        parts.append((W_TITLE, series_similarity(query.title, eigener)
+                      if eigener else 0.0))
     if query.publisher and candidate.publisher:
         parts.append((W_PUBLISHER,
                       series_similarity(query.publisher, candidate.publisher)))

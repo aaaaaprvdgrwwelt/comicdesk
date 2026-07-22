@@ -48,6 +48,9 @@ class SearchQuery:
     issue: str | None = None
     year: int | None = None
     publisher: str | None = None
+    #: Bandtitel - bei europaeischen Alben oft das einzige Unterscheidungs-
+    #: merkmal, wenn es den Serienname mehrfach gibt.
+    title: str | None = None
     cover: bytes | None = None
 
 

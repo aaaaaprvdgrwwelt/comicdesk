@@ -349,9 +349,12 @@ EN = {
     "Treffer wählen …": "Choose match …",
     "Treffer wählen – {name}": "Choose match – {name}",
     "Die Begriffe stammen aus den Tags oder dem Dateinamen. Passt der Treffer "
-    "nicht, liegt es meist daran – korrigieren und erneut suchen.":
+    "nicht, liegt es meist daran – korrigieren und erneut suchen. Gibt es einen "
+    "Serienname mehrfach, hilft der Bandtitel am ehesten weiter.":
         "The terms come from the tags or the file name. If the match is wrong, "
-        "that is usually why - correct them and search again.",
+        "that is usually why - correct them and search again. When a series "
+        "name exists several times, the album title helps most.",
+    "z. B. Gefährliche Heimkehr": "e.g. Dangerous Homecoming",
     "Erneut suchen": "Search again",
     "Im Browser ansehen": "Open in browser",
     "Öffnet die Seite der Quelle zu diesem Treffer - zum Nachsehen, ob es "
