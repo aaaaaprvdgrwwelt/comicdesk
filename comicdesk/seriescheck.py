@@ -107,9 +107,10 @@ class SeriesChecker(QObject):
 
 def summarize(entry: Series) -> str:
     """Kurzfassung fuer die Tabelle."""
-    if entry.known_numbers is None:
+    if entry.reference is None:
         return ""
     missing = entry.missing_known
+    prefix = _("von Hand") + " · " if entry.is_manual else ""
     if not missing:
-        return _("vollständig")
-    return _("{count} fehlen").format(count=len(missing))
+        return prefix + _("vollständig")
+    return prefix + _("{count} fehlen").format(count=len(missing))

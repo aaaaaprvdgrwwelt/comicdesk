@@ -173,6 +173,10 @@ class CollectionIndex:
             CREATE VIRTUAL TABLE IF NOT EXISTS comics_fts
                 USING fts5(path UNINDEXED, body, tokenize='unicode61');
             CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
+            CREATE TABLE IF NOT EXISTS series_manual (
+                series TEXT, publisher TEXT, numbers TEXT, note TEXT,
+                updated_at REAL, PRIMARY KEY (series, publisher)
+            );
             CREATE TABLE IF NOT EXISTS series_known (
                 series TEXT, publisher TEXT, source TEXT,
                 numbers TEXT, series_name TEXT, checked_at REAL,
@@ -468,6 +472,30 @@ class CollectionIndex:
             out[(row["series"], row["publisher"])] = (
                 row["source"], numbers, row["series_name"] or "")
         return out
+
+    def save_manual(self, series: str, publisher: str, numbers: list[str],
+                    note: str = "") -> None:
+        """Von Hand festgelegter Bestand - schlaegt jede Quelle."""
+        con = self._con()
+        con.execute("INSERT OR REPLACE INTO series_manual VALUES (?,?,?,?,?)",
+                    (series, publisher or "", "\n".join(numbers), note,
+                     time.time()))
+        con.commit()
+
+    def load_manual(self) -> dict[tuple[str, str], tuple[list[str], str]]:
+        out: dict[tuple[str, str], tuple[list[str], str]] = {}
+        for row in self._con().execute(
+            "SELECT series, publisher, numbers, note FROM series_manual"
+        ):
+            numbers = [n for n in (row["numbers"] or "").split("\n") if n]
+            out[(row["series"], row["publisher"])] = (numbers, row["note"] or "")
+        return out
+
+    def forget_manual(self, series: str, publisher: str) -> None:
+        con = self._con()
+        con.execute("DELETE FROM series_manual WHERE series=? AND publisher=?",
+                    (series, publisher or ""))
+        con.commit()
 
     def forget_known(self, series: str, publisher: str) -> None:
         con = self._con()

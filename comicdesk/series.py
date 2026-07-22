@@ -57,6 +57,9 @@ class Series:
     known_source: str | None = None
     #: Wie viele Reihen der Quelle diese lokale Reihe abdeckt.
     known_series_names: list[str] = field(default_factory=list)
+    #: Von Hand festgelegter Bestand der Reihe. Schlaegt jede Quelle.
+    manual_numbers: list[str] | None = None
+    manual_note: str = ""
 
     def probe_ids(self, count: int = 4) -> list[str]:
         """Quell-IDs quer ueber die Nummernspanne.
@@ -97,23 +100,57 @@ class Series:
         return f"#{_fmt(low)}–#{_fmt(high)}"
 
     @property
+    def is_manual(self) -> bool:
+        return self.manual_numbers is not None
+
+    @property
+    def reference(self) -> list[str] | None:
+        """Was die Reihe umfasst - von Hand festgelegt schlaegt die Quelle."""
+        if self.manual_numbers is not None:
+            return self.manual_numbers
+        return self.known_numbers
+
+    @property
+    def effective_gaps(self) -> list[str]:
+        """Fehlende Nummern. Bei manueller Festlegung zaehlt nur diese."""
+        if self.manual_numbers is not None:
+            have = {_fmt(n) for n in self.numbers}
+            return [n for n in self.manual_numbers if n not in have]
+        return self.gaps
+
+    @property
+    def unexpected(self) -> list[str]:
+        """Eigene Hefte, die es laut Referenz gar nicht geben duerfte.
+
+        Entweder stimmt die Festlegung nicht oder das Heft ist falsch getaggt -
+        beides sollte man sehen statt es stillschweigend zu schlucken.
+        """
+        reference = self.reference
+        if not reference:
+            return []
+        known = set(reference)
+        return sorted({_fmt(n) for n in self.numbers} - known, key=_sort_key)
+
+    @property
     def missing_after(self) -> list[str]:
         """Nummern, die laut Quelle nach dem hoechsten eigenen Heft kamen."""
-        if not self.known_numbers or not self.numbers:
+        reference = self.reference
+        if not reference or not self.numbers:
             return []
         have = {_fmt(n) for n in self.numbers}
         highest = max(self.numbers)
-        return [n for n in self.known_numbers
+        return [n for n in reference
                 if n not in have and _as_number(n) is not None
                 and _as_number(n) > highest]
 
     @property
     def missing_known(self) -> list[str]:
         """Alles, was die Quelle kennt und im Bestand fehlt."""
-        if not self.known_numbers:
+        reference = self.reference
+        if not reference:
             return []
         have = {_fmt(n) for n in self.numbers}
-        return [n for n in self.known_numbers if n not in have]
+        return [n for n in reference if n not in have]
 
 
 def _fmt(value: float) -> str:
@@ -125,6 +162,68 @@ def _as_number(text: str) -> float | None:
         return float(str(text).strip().lstrip("#"))
     except ValueError:
         return None
+
+
+# --- Bereichsschreibweise: "1-3, 12-20" ------------------------------------
+def parse_ranges(text: str) -> list[str]:
+    """`1-3, 12-20, 5a` -> ['1','2','3','12',…,'20','5a'].
+
+    Nicht-numerische Angaben bleiben unveraendert stehen; Sonderbaende heissen
+    nun einmal "0" oder "5a".
+    """
+    numbers: list[str] = []
+    for part in re.split(r"[,;\n]", text or ""):
+        part = part.strip()
+        if not part:
+            continue
+        match = re.fullmatch(r"(\d+)\s*[-–]\s*(\d+)", part)
+        if match:
+            low, high = int(match.group(1)), int(match.group(2))
+            if low > high:
+                low, high = high, low
+            if high - low > 5000:      # Tippfehler wie "1-99999" abfangen
+                continue
+            numbers += [str(n) for n in range(low, high + 1)]
+        else:
+            numbers.append(part.lstrip("#"))
+    seen: list[str] = []
+    for value in numbers:
+        if value not in seen:
+            seen.append(value)
+    return sorted(seen, key=_sort_key)
+
+
+def format_ranges(numbers: list[str]) -> str:
+    """Umkehrung: ['1','2','3','12'] -> '1-3, 12'."""
+    whole, other = [], []
+    for value in numbers:
+        try:
+            number = int(value)
+        except (TypeError, ValueError):
+            other.append(str(value))
+        else:
+            whole.append(number)
+    whole.sort()
+    parts: list[str] = []
+    start = previous = None
+    for number in whole:
+        if start is None:
+            start = previous = number
+        elif number == previous + 1:
+            previous = number
+        else:
+            parts.append(str(start) if start == previous else f"{start}-{previous}")
+            start = previous = number
+    if start is not None:
+        parts.append(str(start) if start == previous else f"{start}-{previous}")
+    return ", ".join(parts + other)
+
+
+def _sort_key(text: str):
+    try:
+        return (0, float(text), "")
+    except ValueError:
+        return (1, 0.0, str(text))
 
 
 # ---------------------------------------------------------------------------

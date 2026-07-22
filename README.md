@@ -231,6 +231,15 @@ Nicht jede Reihe ist fortlaufend nummeriert: Magazine wie *Zack* oder *Zorro*
 nummerieren nach Datum (`198303` = März 1983). Wo die Nummerierung uneinheitlich
 ist, wird **keine** Lücke behauptet.
 
+**Von Hand festlegen** — wenn du es besser weißt als jede Quelle. Etwa weil
+eine Reihe nur die Nummern 1–3 und 12–20 hat: Bereichsschreibweise
+`1-3, 12-20` eintragen, fertig. Diese Angabe schlägt jede Quelle, Nummern die
+nicht darin stehen gelten nicht mehr als Lücke. Jederzeit änder- und aufhebbar.
+
+Umgekehrt meldet ComicDesk auch, wenn du ein Heft besitzt, das laut Festlegung
+oder Quelle gar nicht existiert — dann stimmt entweder die Festlegung nicht
+oder das Heft ist falsch getaggt.
+
 ComicVine erlaubt 200 Anfragen pro Stunde; „Alle ungeprüften prüfen" läuft
 deshalb lange, ist abbrechbar, wiederaufnehmbar und dauerhaft gecacht.
 

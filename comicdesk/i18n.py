@@ -398,6 +398,33 @@ EN = {
         "No source ID in the tags - this series cannot be matched reliably. "
         "If the issues are tagged, a fresh index run helps.",
 
+    "Reihe von Hand festlegen": "Define series by hand",
+    "Reihe von Hand festlegen …": "Define series by hand …",
+    "Festlegung ändern …": "Change definition …",
+    "Festlegung aufheben": "Remove definition",
+    "Auf vorhandene Hefte setzen": "Set to owned issues",
+    "Übernehmen": "Apply",
+    "von Hand": "by hand",
+    "Welche Nummern gibt es in dieser Reihe wirklich? Bereiche mit Bindestrich, "
+    "mehrere durch Komma getrennt – etwa „1-3, 12-20“. Diese Angabe schlägt "
+    "jede Quelle: Nummern, die hier nicht stehen, gelten nicht mehr als Lücke.":
+        "Which numbers does this series actually have? Ranges with a hyphen, "
+        "separated by commas - for example \u201c1-3, 12-20\u201d. This "
+        "overrides every source: numbers not listed here no longer count as "
+        "gaps.",
+    "{total} Hefte in der Reihe · {owned} davon vorhanden · {missing} fehlen":
+        "{total} issues in the series · {owned} of them owned · {missing} missing",
+    "Von Hand festgelegt: {ranges}": "Defined by hand: {ranges}",
+    "Davon fehlen dir ({count}):": "Of those you are missing ({count}):",
+    "Du hast alle festgelegten Nummern.": "You have every number defined.",
+    "Diese Angabe schlägt jede Quelle.": "This overrides every source.",
+    "Vorhanden, aber nicht festgelegt ({count}): {numbers}":
+        "Owned but not defined ({count}): {numbers}",
+    "Entweder fehlt das in der Festlegung, oder das Heft ist falsch getaggt.":
+        "Either the definition is incomplete, or the issue is tagged wrongly.",
+    "Vorhanden, aber der Quelle unbekannt ({count}): {numbers}":
+        "Owned but unknown to the source ({count}): {numbers}",
+
     # --- Herkunft der Tags
     "Grand Comics Database": "Grand Comics Database",
     "Von Hand": "Entered by hand",

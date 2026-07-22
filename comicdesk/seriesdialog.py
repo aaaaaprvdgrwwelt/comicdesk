@@ -6,8 +6,8 @@ from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QAbstractItemView, QCheckBox, QDialog, QHBoxLayout, QHeaderView, QLabel,
-    QProgressBar, QPushButton, QSplitter, QTableWidget, QTableWidgetItem,
-    QTextEdit, QVBoxLayout, QWidget,
+    QLineEdit, QProgressBar, QPushButton, QSplitter, QTableWidget,
+    QTableWidgetItem, QTextEdit, QVBoxLayout, QWidget,
 )
 
 from . import series as series_mod
@@ -17,6 +17,84 @@ from .index import CollectionIndex
 from .seriescheck import SeriesChecker, summarize
 
 PATH_ROLE = Qt.UserRole + 1
+
+
+class ManualSeriesDialog(QDialog):
+    """Bestand einer Reihe von Hand festlegen."""
+
+    def __init__(self, entry, parent=None):
+        super().__init__(parent)
+        self.entry = entry
+        self.result_numbers: list[str] | None = None
+        self.cleared = False
+
+        self.setWindowTitle(_("Reihe von Hand festlegen"))
+        self.setMinimumWidth(520)
+        root = QVBoxLayout(self)
+        root.addWidget(QLabel(
+            f"<b>{entry.name}</b>" + (f" · {entry.publisher}" if entry.publisher else "")))
+        hint = QLabel(_(
+            "Welche Nummern gibt es in dieser Reihe wirklich? Bereiche mit "
+            "Bindestrich, mehrere durch Komma getrennt – etwa "
+            "„1-3, 12-20“. Diese Angabe schlägt jede Quelle: Nummern, die hier "
+            "nicht stehen, gelten nicht mehr als Lücke."))
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color:gray;")
+        root.addWidget(hint)
+
+        self.edit = QLineEdit()
+        vorhanden = series_mod.format_ranges(
+            [series_mod._fmt(n) for n in sorted(entry.numbers)])
+        if entry.manual_numbers is not None:
+            self.edit.setText(series_mod.format_ranges(entry.manual_numbers))
+        elif entry.known_numbers:
+            self.edit.setText(series_mod.format_ranges(entry.known_numbers))
+        else:
+            self.edit.setText(vorhanden)
+        self.edit.textChanged.connect(self._preview)
+        root.addWidget(self.edit)
+
+        self.preview = QLabel()
+        self.preview.setWordWrap(True)
+        root.addWidget(self.preview)
+
+        buttons = QHBoxLayout()
+        self.btn_owned = QPushButton(_("Auf vorhandene Hefte setzen"))
+        self.btn_owned.clicked.connect(lambda: self.edit.setText(vorhanden))
+        self.btn_clear = QPushButton(_("Festlegung aufheben"))
+        self.btn_clear.clicked.connect(self._clear)
+        self.btn_clear.setEnabled(entry.manual_numbers is not None)
+        ok = QPushButton(_("Übernehmen"))
+        ok.setDefault(True)
+        ok.clicked.connect(self._accept)
+        cancel = QPushButton(_("Abbrechen"))
+        cancel.clicked.connect(self.reject)
+        buttons.addWidget(self.btn_owned)
+        buttons.addWidget(self.btn_clear)
+        buttons.addStretch(1)
+        buttons.addWidget(ok)
+        buttons.addWidget(cancel)
+        root.addLayout(buttons)
+        self._preview()
+
+    def _preview(self) -> None:
+        numbers = series_mod.parse_ranges(self.edit.text())
+        have = {series_mod._fmt(n) for n in self.entry.numbers}
+        missing = [n for n in numbers if n not in have]
+        self.preview.setText(_(
+            "{total} Hefte in der Reihe · {owned} davon vorhanden · "
+            "{missing} fehlen").format(
+                total=len(numbers), owned=len(numbers) - len(missing),
+                missing=len(missing)))
+
+    def _clear(self) -> None:
+        self.cleared = True
+        self.accept()
+
+    def _accept(self) -> None:
+        self.result_numbers = series_mod.parse_ranges(self.edit.text())
+        self.accept()
+
 
 
 class SeriesDialog(QDialog):
@@ -76,6 +154,9 @@ class SeriesDialog(QDialog):
         self.btn_check_one = QPushButton(_("Diese Reihe prüfen"))
         self.btn_check_one.clicked.connect(self._check_selected)
         right_layout.addWidget(self.btn_check_one)
+        self.btn_manual = QPushButton(_("Reihe von Hand festlegen …"))
+        self.btn_manual.clicked.connect(self._edit_manual)
+        right_layout.addWidget(self.btn_manual)
         split.addWidget(right)
         split.setSizes([680, 420])
         root.addWidget(split, 1)
@@ -107,11 +188,15 @@ class SeriesDialog(QDialog):
         rows = self.index.series_rows(self.collection)
         self.entries = series_mod.build(rows)
         known = self.index.load_known()
+        manual = self.index.load_manual()
         for entry in self.entries:
             saved = known.get(entry.key)
             if saved:
                 entry.known_source, entry.known_numbers, name = saved
                 entry.known_series_names = [name] if name else []
+            eigen = manual.get(entry.key)
+            if eigen:
+                entry.manual_numbers, entry.manual_note = eigen
         self._fill_table()
 
     def _visible(self) -> list[series_mod.Series]:
@@ -119,7 +204,7 @@ class SeriesDialog(QDialog):
         if self.hide_single.isChecked():
             entries = [e for e in entries if e.count > 1]
         if self.only_gaps.isChecked():
-            entries = [e for e in entries if e.gaps or e.missing_known]
+            entries = [e for e in entries if e.effective_gaps]
         return entries
 
     def _fill_table(self) -> None:
@@ -129,17 +214,19 @@ class SeriesDialog(QDialog):
         for entry in entries:
             row = self.table.rowCount()
             self.table.insertRow(row)
-            gaps = (_("uneinheitlich") if entry.scheme == series_mod.MIXED
-                    else str(len(entry.gaps)) if entry.gaps else "–")
+            fehlend = entry.effective_gaps
+            gaps = (_("uneinheitlich")
+                    if entry.scheme == series_mod.MIXED and not entry.is_manual
+                    else str(len(fehlend)) if fehlend else "–")
             values = [entry.name, entry.publisher or "–", str(entry.count),
                       entry.span, gaps, summarize(entry)]
             for column, value in enumerate(values):
                 item = QTableWidgetItem(value)
                 if column == 2:
                     item.setData(Qt.DisplayRole, entry.count)
-                if column == 4 and entry.gaps:
+                if column == 4 and fehlend:
                     item.setForeground(QColor(200, 120, 40))
-                if column == 5 and entry.known_numbers is not None:
+                if column == 5 and entry.reference is not None:
                     item.setForeground(QColor(70, 150, 95)
                                        if not entry.missing_known
                                        else QColor(200, 120, 40))
@@ -173,6 +260,27 @@ class SeriesDialog(QDialog):
             f"{entry.name}" + (f" · {entry.publisher}" if entry.publisher else ""))
         parts = [_("{count} Hefte, {span}").format(count=entry.count,
                                                    span=entry.span), ""]
+        if entry.is_manual:
+            parts += [_("Von Hand festgelegt: {ranges}").format(
+                ranges=series_mod.format_ranges(entry.manual_numbers)), ""]
+            fehlend = entry.effective_gaps
+            if fehlend:
+                parts += [_("Davon fehlen dir ({count}):").format(
+                    count=len(fehlend)), _wrap(fehlend), ""]
+            else:
+                parts += [_("Du hast alle festgelegten Nummern."), ""]
+            if entry.unexpected:
+                parts += [_("Vorhanden, aber nicht festgelegt ({count}): "
+                            "{numbers}").format(count=len(entry.unexpected),
+                                                numbers=_wrap(entry.unexpected)),
+                          _("Entweder fehlt das in der Festlegung, oder das "
+                            "Heft ist falsch getaggt."), ""]
+            parts += [_("Diese Angabe schlägt jede Quelle.")]
+            self.detail.setPlainText("\n".join(parts))
+            self.btn_check_one.setEnabled(bool(entry.samples))
+            self.btn_manual.setText(_("Festlegung ändern …"))
+            return
+        self.btn_manual.setText(_("Reihe von Hand festlegen …"))
         if entry.scheme == series_mod.MIXED:
             parts += [_("Die Heftnummern dieser Reihe sind uneinheitlich "
                         "(etwa fortlaufend und nach Datum gemischt). Deshalb "
@@ -214,10 +322,39 @@ class SeriesDialog(QDialog):
             else:
                 parts += ["", _("Deine Sammlung enthält alles, was die Quelle "
                                 "kennt.")]
+            if entry.unexpected:
+                parts += ["", _("Vorhanden, aber der Quelle unbekannt "
+                                "({count}): {numbers}").format(
+                    count=len(entry.unexpected),
+                    numbers=_wrap(entry.unexpected))]
             parts += ["", _("Das ist eine Angabe der Quelle, keine "
                             "Gewissheit.")]
         self.detail.setPlainText("\n".join(parts))
         self.btn_check_one.setEnabled(bool(entry.samples))
+
+    def _edit_manual(self) -> None:
+        entry = self._selected()
+        if entry is None:
+            return
+        dialog = ManualSeriesDialog(entry, self)
+        if not dialog.exec():
+            return
+        if dialog.cleared:
+            self.index.forget_manual(entry.name, entry.publisher or "")
+            entry.manual_numbers, entry.manual_note = None, ""
+        else:
+            entry.manual_numbers = dialog.result_numbers
+            self.index.save_manual(entry.name, entry.publisher or "",
+                                   dialog.result_numbers)
+        self._fill_table()
+        self._reselect(entry)
+
+    def _reselect(self, entry) -> None:
+        for row in range(self.table.rowCount()):
+            if tuple(self.table.item(row, 0).data(PATH_ROLE)) == entry.key:
+                self.table.selectRow(row)
+                return
+        self._show_details()
 
     # --- Pruefen ------------------------------------------------------
     def _providers(self):
