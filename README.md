@@ -8,6 +8,8 @@ Tags werden als `ComicInfo.xml` ins Archiv geschrieben — dasselbe Format, das
 ComicTagger, Komga, Kavita und ComicRack lesen. Automatisches Taggen gegen
 ComicVine oder einen lokalen Dump der Grand Comics Database.
 
+**Projektseite:** <https://aaaaaprvdgrwwelt.github.io/comicdesk/>
+
 > Status: nutzbar, aber jung. Entwickelt und getestet unter Linux; Windows und
 > macOS sollten funktionieren (reines Qt/Python), sind aber ungetestet. Es gibt
 > noch keine automatisierte Testsuite — siehe [Bekannte Grenzen](#bekannte-grenzen).

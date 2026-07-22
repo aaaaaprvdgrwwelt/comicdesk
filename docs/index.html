@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ComicDesk – ein Dateimanager nur für Comics</title>
+<meta name="description" content="Ein Dateimanager, der nur Comics kennt: browsen, lesen, taggen, Reihen auf Lücken prüfen. Python + Qt, Linux/Windows/macOS, Deutsch und Englisch.">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<meta property="og:title" content="ComicDesk">
+<meta property="og:description" content="Ein Dateimanager, der nur Comics kennt: browsen, lesen, taggen, Reihen auf Lücken prüfen.">
+<meta property="og:type" content="website">
+<style>
+:root {
+  --bg: #fbf9f6; --fg: #23202b; --muted: #6b6577; --line: #e3ded6;
+  --card: #ffffff; --accent: #7a3f78; --accent-fg: #ffffff;
+  --code-bg: #f3efe9; --shadow: 0 1px 2px rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.05);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #16141b; --fg: #e8e4ee; --muted: #a49dae; --line: #2e2937;
+    --card: #1e1b25; --accent: #c081bb; --accent-fg: #1a1620;
+    --code-bg: #242030; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #16141b; --fg: #e8e4ee; --muted: #a49dae; --line: #2e2937;
+  --card: #1e1b25; --accent: #c081bb; --accent-fg: #1a1620;
+  --code-bg: #242030; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3);
+}
+:root[data-theme="light"] {
+  --bg: #fbf9f6; --fg: #23202b; --muted: #6b6577; --line: #e3ded6;
+  --card: #ffffff; --accent: #7a3f78; --accent-fg: #ffffff;
+  --code-bg: #f3efe9; --shadow: 0 1px 2px rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.05);
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font: 16px/1.65 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  overflow-x: hidden;
+}
+.wrap { max-width: 880px; margin: 0 auto; padding: 0 20px; }
+a { color: var(--accent); }
+
+/* Kopf */
+header { padding: 72px 0 56px; border-bottom: 1px solid var(--line); }
+.brand { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+.brand svg { width: 84px; height: 84px; flex: none; border-radius: 19px; box-shadow: var(--shadow); }
+h1 { margin: 0; font-size: clamp(2rem, 6vw, 2.9rem); letter-spacing: -.02em; }
+.tagline { margin: 18px 0 0; font-size: 1.2rem; color: var(--muted); max-width: 34em; }
+.buttons { margin-top: 30px; display: flex; gap: 12px; flex-wrap: wrap; }
+.btn {
+  display: inline-block; padding: 11px 20px; border-radius: 9px;
+  text-decoration: none; font-weight: 600; font-size: .96rem;
+  border: 1px solid var(--line); color: var(--fg); background: var(--card);
+}
+.btn.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+
+/* Abschnitte */
+section { padding: 52px 0; border-bottom: 1px solid var(--line); }
+section:last-of-type { border-bottom: 0; }
+h2 { font-size: 1.5rem; margin: 0 0 8px; letter-spacing: -.01em; }
+h2 + .sub { margin: 0 0 28px; color: var(--muted); }
+h3 { font-size: 1.05rem; margin: 0 0 6px; }
+
+/* Karten */
+.cards { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.card {
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: 12px; padding: 20px; box-shadow: var(--shadow);
+}
+.card p { margin: 0; color: var(--muted); font-size: .93rem; }
+
+/* Code */
+pre {
+  background: var(--code-bg); border: 1px solid var(--line); border-radius: 10px;
+  padding: 16px 18px; overflow-x: auto; font-size: .88rem; line-height: 1.6;
+}
+code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+p code, li code, td code { background: var(--code-bg); padding: .12em .38em; border-radius: 4px; font-size: .89em; }
+
+/* Tabellen */
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: .93rem; }
+th, td { text-align: left; padding: 9px 14px 9px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-weight: 600; white-space: nowrap; }
+
+/* Hinweis */
+.note {
+  background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--accent);
+  border-radius: 0 10px 10px 0; padding: 16px 20px; margin: 26px 0 0;
+  font-size: .93rem; color: var(--muted);
+}
+.note strong { color: var(--fg); }
+
+/* Screenshot-Platzhalter */
+.shots { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+figure { margin: 0; }
+figure img { width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--line); box-shadow: var(--shadow); display: block; }
+figcaption { margin-top: 8px; font-size: .86rem; color: var(--muted); }
+.placeholder {
+  aspect-ratio: 16 / 10; border: 1px dashed var(--line); border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--muted); font-size: .86rem; text-align: center; padding: 16px;
+  background: var(--card);
+}
+
+footer { padding: 40px 0 60px; color: var(--muted); font-size: .9rem; }
+footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <div class="brand">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="ComicDesk-Symbol">
+        <defs>
+          <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#4a3a7a"/><stop offset="1" stop-color="#8a3f78"/>
+          </linearGradient>
+          <linearGradient id="page" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#fffaf0"/><stop offset="1" stop-color="#f2e4cd"/>
+          </linearGradient>
+        </defs>
+        <rect x="0" y="0" width="512" height="512" rx="114" fill="url(#bg)"/>
+        <g transform="rotate(-9 256 272)" opacity="0.55">
+          <rect x="132" y="128" width="196" height="268" rx="14" fill="#efe0c6"/>
+          <rect x="132" y="128" width="26" height="268" rx="13" fill="#d8b98f"/>
+        </g>
+        <g transform="rotate(7 256 272)">
+          <rect x="176" y="112" width="204" height="278" rx="16" fill="url(#page)"/>
+          <rect x="176" y="112" width="28" height="278" rx="14" fill="#e0452f"/>
+          <path d="M232 168 h116 a20 20 0 0 1 20 20 v66 a20 20 0 0 1 -20 20 h-52
+                   l-30 30 v-30 h-34 a20 20 0 0 1 -20 -20 v-66 a20 20 0 0 1 20 -20 z" fill="#3a2c5e"/>
+          <circle cx="262" cy="221" r="9" fill="#fffaf0"/>
+          <circle cx="292" cy="221" r="9" fill="#fffaf0"/>
+          <circle cx="322" cy="221" r="9" fill="#fffaf0"/>
+          <rect x="216" y="312" width="128" height="12" rx="6" fill="#c9b48f"/>
+          <rect x="216" y="340" width="88" height="12" rx="6" fill="#c9b48f"/>
+        </g>
+      </svg>
+      <h1>ComicDesk</h1>
+    </div>
+
+    <p class="tagline">
+      Ein Dateimanager, der nur Comics kennt: browsen, lesen, taggen, umbenennen,
+      kopieren, verschieben, löschen. Und die Frage beantworten, welche Hefte
+      einer Reihe noch fehlen.
+    </p>
+
+    <div class="buttons">
+      <a class="btn primary" href="https://github.com/aaaaaprvdgrwwelt/comicdesk">Auf GitHub ansehen</a>
+      <a class="btn" href="#installation">Installation</a>
+      <a class="btn" href="#taggen">Automatisches Taggen</a>
+    </div>
+
+    <div class="note">
+      <strong>Status: nutzbar, aber jung.</strong> Entwickelt und getestet unter Linux.
+      Windows und macOS sollten laufen (reines Qt/Python), sind aber ungetestet.
+      Eine automatisierte Testsuite gibt es noch nicht.
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <h2>Was es kann</h2>
+    <p class="sub">Oberfläche auf Deutsch und Englisch, umschaltbar im laufenden Betrieb.</p>
+    <div class="cards">
+      <div class="card">
+        <h3>Browsen und lesen</h3>
+        <p>Cover-Kacheln, Ordnerbaum, der bei deinen Sammlungen beginnt statt bei <code>/</code>.
+           Eingebauter Reader mit Tastaturbedienung und Vollbild.</p>
+      </div>
+      <div class="card">
+        <h3>Taggen</h3>
+        <p>Schreibt <code>ComicInfo.xml</code> ins Archiv — dasselbe Format, das
+           ComicTagger, Komga, Kavita und ComicRack lesen.</p>
+      </div>
+      <div class="card">
+        <h3>Automatisch taggen</h3>
+        <p>Gegen ComicVine <em>und</em> einen lokalen Dump der Grand Comics Database.
+           Gewichtete Bewertung, Cover-Abgleich per Bild-Hash.</p>
+      </div>
+      <div class="card">
+        <h3>Reihen prüfen</h3>
+        <p>Welche Ausgaben fehlen? Lücken im eigenen Bestand und Angaben der Quelle
+           werden getrennt geführt — nie vermischt.</p>
+      </div>
+      <div class="card">
+        <h3>Sammlungen durchsuchen</h3>
+        <p>SQLite-Index mit Feldsuche: <code>serie:batman jahr:2019 joker</code>.
+           Treffer erscheinen als Reihen und als einzelne Ausgaben.</p>
+      </div>
+      <div class="card">
+        <h3>Seiten verwalten</h3>
+        <p>Seiten löschen und umsortieren, mit Rückgängig. Geschrieben wird erst
+           auf Befehl — bis dahin bleibt die Datei unangetastet.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Bilder</h2>
+    <p class="sub">Noch nicht bestückt.</p>
+    <div class="shots">
+      <figure><div class="placeholder">Kachelansicht mit Covern</div></figure>
+      <figure><div class="placeholder">Trefferwahl beim Taggen</div></figure>
+      <figure><div class="placeholder">Reihenansicht mit fehlenden Heften</div></figure>
+    </div>
+  </div>
+</section>
+
+<section id="installation">
+  <div class="wrap">
+    <h2>Installation</h2>
+    <p class="sub">Voraussetzung ist Python 3.10 oder neuer.</p>
+<pre><code>git clone https://github.com/aaaaaprvdgrwwelt/comicdesk.git
+cd comicdesk
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt</code></pre>
+    <p>Für CBR und CB7 wird zusätzlich <code>7z</code> gebraucht:</p>
+<pre><code>sudo apt install p7zip-full p7zip-rar   # Debian/Ubuntu</code></pre>
+    <h3 style="margin-top:28px">Starten</h3>
+<pre><code>./comicdesk.sh            # oder: .venv/bin/python -m comicdesk
+./comicdesk.sh ~/Comics   # direkt in einem Ordner starten
+./install-desktop.sh      # Eintrag im Anwendungsmenü anlegen</code></pre>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Formate</h2>
+    <p class="sub">Die Wahrheit über einen Comic steht immer in der Datei selbst, nicht im Index.</p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Format</th><th>Lesen</th><th>Tags schreiben</th><th>Seiten bearbeiten</th></tr></thead>
+        <tbody>
+          <tr><td>CBZ / ZIP</td><td>ja</td><td>ja (ComicInfo.xml im Archiv)</td><td>ja</td></tr>
+          <tr><td>CBR / CB7</td><td>ja, via <code>7z</code></td><td>nein → „Nach CBZ konvertieren“</td><td>nein</td></tr>
+          <tr><td>CBT</td><td>ja</td><td>nein → „Nach CBZ konvertieren“</td><td>nein</td></tr>
+          <tr><td>PDF</td><td>ja, via PyMuPDF</td><td>ja (Datei daneben)</td><td>ja</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section id="taggen">
+  <div class="wrap">
+    <h2>Automatisches Taggen</h2>
+    <p class="sub">Beide Quellen können gleichzeitig aktiv sein; bewertet wird quellenübergreifend.</p>
+
+    <h3>ComicVine</h3>
+    <p>API-Key kostenlos nach Registrierung. Limit sind 200 Anfragen pro Stunde, deshalb
+       wird auf etwa eine Anfrage pro Sekunde gedrosselt und jede Antwort dauerhaft
+       zwischengespeichert. Liefert Cover-URLs — nur damit ist der Bildabgleich möglich.</p>
+
+    <h3 style="margin-top:24px">GCD (lokal)</h3>
+    <p>Die Grand Comics Database hat keine öffentliche API, stellt aber alle zwei Wochen
+       SQLite-Dumps bereit. Einmal „Suche vorbereiten“ drücken — das ist nicht optional:</p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Serie suchen</th><th>Dauer</th></tr></thead>
+        <tbody>
+          <tr><td>ohne Vorbereitung</td><td>15.900 ms</td></tr>
+          <tr><td>mit Volltextindex</td><td><strong>0,2 ms</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin-top:16px">Gemessen an einem echten Dump (6,2 GB). Der Aufbau dauert rund
+       zehn Sekunden und legt eine eigene 7-MB-Datei an; der Dump selbst wird
+       <strong>nicht</strong> verändert.</p>
+
+    <div class="note">
+      <strong>Woher die Tags kommen, bleibt sichtbar.</strong> Jede Kachel trägt einen
+      Punkt: ComicVine, GCD, von Hand eingetragen, getaggt ohne erkennbare Quelle,
+      ungetaggt. „Von Hand“ wird nur dort behauptet, wo es belegt ist.
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Reihen: was fehlt mir?</h2>
+    <p class="sub">Zwei Aussagen, bewusst nie vermischt.</p>
+    <div class="cards">
+      <div class="card">
+        <h3>Lücke</h3>
+        <p>Zwischen zwei Heften, die du hast, fehlt eine Nummer. Folgt allein aus dem
+           eigenen Bestand, braucht keine Quelle, ist nicht bestreitbar.</p>
+      </div>
+      <div class="card">
+        <h3>Laut Quelle</h3>
+        <p>Dass eine Reihe über dein höchstes Heft hinaus weiterging, weiß nur eine
+           externe Quelle. Wird mit Quellenangabe geführt und als Angabe gekennzeichnet,
+           nicht als Gewissheit.</p>
+      </div>
+    </div>
+    <p style="margin-top:22px">Die Zuordnung läuft über die <strong>in den Tags gespeicherte
+       Heft-ID</strong>, nicht über den Serientitel. Eine Namenssuche nach „Die Rächer“
+       greift bei GCD sonst die Condor-Auflage von 1979, obwohl die eigene Reihe eine
+       andere ist. Nicht jede Reihe ist fortlaufend nummeriert — Magazine wie <em>Zack</em>
+       nummerieren nach Datum. Wo die Nummerierung uneinheitlich ist, wird
+       <strong>keine</strong> Lücke behauptet. Und wer es besser weiß als jede Quelle,
+       trägt die Nummern selbst ein: <code>1-3, 12-20</code>.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Suchsyntax</h2>
+    <p class="sub">Feldsuchen und freier Text lassen sich mischen. Die englischen Namen funktionieren ebenso.</p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Beispiel</th><th>Wirkung</th></tr></thead>
+        <tbody>
+          <tr><td><code>joker</code></td><td>Volltext über alle Felder</td></tr>
+          <tr><td><code>serie:batman</code></td><td>Serienname enthält „batman“</td></tr>
+          <tr><td><code>jahr:1990-1999</code></td><td>Jahr exakt oder als Zeitraum</td></tr>
+          <tr><td><code>autor:gottfredson</code></td><td>beliebige mitwirkende Person</td></tr>
+          <tr><td><code>getaggt:nein</code></td><td>alles ohne Tags</td></tr>
+          <tr><td><code>quelle:comicvine</code></td><td>woher die Tags stammen</td></tr>
+          <tr><td><code>serie:batman jahr:2019 joker</code></td><td>alles kombinierbar (UND)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p>
+      MIT-Lizenz ·
+      <a href="https://github.com/aaaaaprvdgrwwelt/comicdesk">Quellcode</a> ·
+      <a href="https://github.com/aaaaaprvdgrwwelt/comicdesk/blob/main/README.md">Vollständige Dokumentation</a> ·
+      <a href="https://github.com/aaaaaprvdgrwwelt/comicdesk/issues">Fehler melden</a>
+    </p>
+    <p>Comic-Daten von <a href="https://comicvine.gamespot.com/">ComicVine</a> und der
+       <a href="https://www.comics.org/">Grand Comics Database</a> (CC-BY).</p>
+  </div>
+</footer>
+
+</body>
+</html>
