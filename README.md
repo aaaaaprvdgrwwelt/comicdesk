@@ -332,8 +332,12 @@ Monsters: Sword & Shield"), werden nicht erkannt.
 (bei PDF die Sidecar-Datei) — für den Fall, dass die vorhandenen Tags aus einer
 falschen Zuordnung stammen. Die Seiten bleiben unberührt.
 
-Beim Auto-Taggen gibt es dazu **„Vorhandene Tags dabei ersetzen statt
-ergänzen"**. Ohne Haken bleiben Felder stehen, welche die Quelle nicht füllt,
+Beide Schalter stehen im Tagging-Fenster selbst, direkt über dem Protokoll —
+und zusätzlich in den Einstellungen; beide Orte bleiben synchron.
+
+**„Auch Dateien anfassen, die schon Tags haben"** erzwingt die Abfrage auch
+für bereits getaggte Dateien, die sonst übersprungen werden. Dazu
+**„Vorhandene Tags dabei ersetzen statt ergänzen"**. Ohne Haken bleiben Felder stehen, welche die Quelle nicht füllt,
 und deine eigenen freien Tags; mit Haken wird alles verworfen und neu
 geschrieben. Die Option greift nur zusammen mit „Auch Dateien anfassen, die
 schon Tags haben" und ist sonst ausgegraut.

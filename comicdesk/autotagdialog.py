@@ -359,6 +359,27 @@ class AutoTagDialog(QDialog):
         self.resize(1000, 560)
 
         root = QVBoxLayout(self)
+
+        # Dieselben Schalter wie in den Einstellungen, aber dort wo man sie
+        # braucht: kurz vor dem Lauf.
+        gespeichert = TaggerSettings.load(self.settings)
+        self.opt_overwrite = QCheckBox(
+            _("Auch Dateien anfassen, die schon Tags haben"))
+        self.opt_overwrite.setChecked(gespeichert.overwrite_existing)
+        self.opt_replace = QCheckBox(
+            _("Vorhandene Tags dabei ersetzen statt ergänzen"))
+        self.opt_replace.setChecked(gespeichert.replace_existing)
+        self.opt_replace.setEnabled(self.opt_overwrite.isChecked())
+        self.opt_overwrite.toggled.connect(self.opt_replace.setEnabled)
+        for schalter in (self.opt_overwrite, self.opt_replace):
+            schalter.toggled.connect(self._save_options)
+        optionen = QHBoxLayout()
+        optionen.addWidget(self.opt_overwrite)
+        optionen.addSpacing(16)
+        optionen.addWidget(self.opt_replace)
+        optionen.addStretch(1)
+        root.addLayout(optionen)
+
         self.status = QLabel(_("Bereit."))
         root.addWidget(self.status)
         self.bar = QProgressBar()
@@ -405,6 +426,13 @@ class AutoTagDialog(QDialog):
     # ------------------------------------------------------------------
     def _open_settings(self) -> None:
         SourcesDialog(self.settings, self).exec()
+        gespeichert = TaggerSettings.load(self.settings)
+        for schalter, wert in ((self.opt_overwrite, gespeichert.overwrite_existing),
+                               (self.opt_replace, gespeichert.replace_existing)):
+            schalter.blockSignals(True)
+            schalter.setChecked(wert)
+            schalter.blockSignals(False)
+        self.opt_replace.setEnabled(self.opt_overwrite.isChecked())
 
     def start(self) -> None:
         config = TaggerSettings.load(self.settings).build_config()
@@ -438,6 +466,14 @@ class AutoTagDialog(QDialog):
         self.worker.finished.connect(self._on_finished)
         self.thread.start()
 
+    def _save_options(self) -> None:
+        """Sofort speichern, damit Einstellungsdialog und Lauf nicht
+        auseinanderlaufen."""
+        gespeichert = TaggerSettings.load(self.settings)
+        gespeichert.overwrite_existing = self.opt_overwrite.isChecked()
+        gespeichert.replace_existing = self.opt_replace.isChecked()
+        gespeichert.save(self.settings)
+
     def _open_match(self, index) -> None:
         """Zeile doppelt geklickt: Vorschlaege fuer diese Datei zeigen."""
         if self.running or not index.isValid():
@@ -467,6 +503,9 @@ class AutoTagDialog(QDialog):
         """Waehrend des Laufs gibt es nur einen Ausweg: Abbrechen."""
         self.btn_start.setEnabled(not running)
         self.btn_settings.setEnabled(not running)
+        self.opt_overwrite.setEnabled(not running)
+        self.opt_replace.setEnabled(
+            not running and self.opt_overwrite.isChecked())
         self.btn_stop.setEnabled(running)
         self.btn_close.setVisible(not running)
         self.bar.setVisible(True)
