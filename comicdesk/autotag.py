@@ -1,6 +1,7 @@
 """Automatisches Taggen: Kandidaten bewerten und ab Schwellwert schreiben."""
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -99,9 +100,16 @@ def score_candidate(query: SearchQuery, candidate: Candidate,
     return round(100 * sum(w * v for w, v in parts) / total_weight)
 
 
-def identify(path: Path, config: AutoTagConfig
+def identify(path: Path, config: AutoTagConfig,
+             should_stop: Callable[[], bool] | None = None
              ) -> tuple[Candidate | None, str, SearchQuery | None]:
-    """Besten Kandidaten fuer eine Datei suchen."""
+    """Besten Kandidaten fuer eine Datei suchen.
+
+    `should_stop` wird zwischen den Quellen und zwischen den Kandidaten
+    abgefragt - eine einzelne Datei kann ueber Netz mehrere Sekunden dauern,
+    und so lange darf ein Abbruch nicht wirkungslos bleiben.
+    """
+    stopped = should_stop or (lambda: False)
     comic = archive.open_comic(path)
     try:
         existing = comic.read_metadata()
@@ -116,6 +124,8 @@ def identify(path: Path, config: AutoTagConfig
     best: Candidate | None = None
     notes: list[str] = []
     for provider in config.providers:
+        if stopped():
+            break
         if provider.role == ROLE_SUPPLEMENT:
             continue  # ergaenzt nur, bestimmt nie das Heft
         ok, why = provider.available()
@@ -128,6 +138,8 @@ def identify(path: Path, config: AutoTagConfig
             notes.append(f"{_(provider.label)}: {exc}")
             continue
         for candidate in candidates:
+            if stopped():
+                break
             sim = None
             if config.use_cover_match and provider.has_covers and cover:
                 sim = cover_similarity(cover, provider.fetch_cover(candidate))
@@ -214,6 +226,10 @@ class AutoTagWorker(QObject):
     def stop(self) -> None:
         self._stop = True
 
+    @property
+    def stopped(self) -> bool:
+        return self._stop
+
     def run(self) -> None:
         by_name = {p.name: p for p in self.config.providers}
         for i, path in enumerate(self.paths, 1):
@@ -240,10 +256,13 @@ class AutoTagWorker(QObject):
             return Result(path, "uebersprungen", detail=_("Hat bereits Tags."))
 
         try:
-            candidate, notes, query = identify(path, self.config)
+            candidate, notes, query = identify(path, self.config,
+                                               lambda: self._stop)
         except Exception as exc:  # noqa: BLE001
             return Result(path, "Fehler", detail=str(exc))
 
+        if self._stop:
+            return Result(path, "abgebrochen")
         if candidate is None:
             return Result(path, "kein Treffer", detail=notes)
 

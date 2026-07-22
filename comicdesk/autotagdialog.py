@@ -1,9 +1,12 @@
 """Dialoge fuer Quellen-Einstellungen und den Auto-Tag-Lauf."""
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
-from PySide6.QtCore import QObject, Qt, QSettings, QThread, Signal
+from PySide6.QtCore import (
+    QObject, Qt, QSettings, QThread, QTimer, Signal,
+)
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout,
@@ -22,6 +25,7 @@ STATUS_COLORS = {
     "kein Treffer": QColor(130, 130, 130),
     "uebersprungen": QColor(110, 110, 110),
     "Fehler": QColor(180, 50, 50),
+    "abgebrochen": QColor(140, 120, 90),
 }
 
 GCD_LANGUAGES = [("Alle Sprachen", ""), ("Deutsch", "de"), ("Englisch", "en"),
@@ -328,6 +332,13 @@ class AutoTagDialog(QDialog):
         self.thread = None
         self.worker = None
         self.counts: dict[str, int] = {}
+        self._current: tuple[int, int, str] | None = None
+        self._current_since = 0.0
+        # Zeigt die Sekunden zur laufenden Datei - ohne das wirkt eine lange
+        # Netzabfrage wie ein Absturz.
+        self._tick = QTimer(self)
+        self._tick.setInterval(1000)
+        self._tick.timeout.connect(self._update_status)
 
         self.setWindowTitle(
             _("Automatisch taggen – {count} Datei(en)").format(count=len(paths)))
@@ -398,7 +409,11 @@ class AutoTagDialog(QDialog):
         self.table.setRowCount(0)
         self.counts.clear()
         self.banner.setVisible(False)
+        self.btn_stop.setText(_("Abbrechen"))
         self._set_running(True)
+        self._current_name = ""
+        self._current_since = time.monotonic()
+        self._tick.start()
 
         self.thread, self.worker = run_in_thread(self.paths, config)
         self.worker.progress.connect(self._on_progress)
@@ -419,14 +434,28 @@ class AutoTagDialog(QDialog):
         return self.thread is not None and self.thread.isRunning()
 
     def stop(self) -> None:
-        if self.worker:
-            self.worker.stop()
-            self.status.setText(_("Wird nach der laufenden Datei beendet …"))
+        if not self.worker:
+            return
+        self.worker.stop()
+        self.btn_stop.setEnabled(False)
+        self.btn_stop.setText(_("Wird abgebrochen …"))
+        self.status.setText(_("Abbruch – die laufende Datei wird noch beendet."))
 
     def _on_progress(self, done: int, total: int, name: str) -> None:
         self.bar.setValue(done - 1)
-        self.status.setText(
-            _("[{done}/{total}] {name}").format(done=done, total=total, name=name))
+        self._current = (done, total, name)
+        self._current_since = time.monotonic()
+        self._update_status()
+
+    def _update_status(self) -> None:
+        if not getattr(self, "_current", None):
+            return
+        done, total, name = self._current
+        seconds = int(time.monotonic() - self._current_since)
+        text = _("[{done}/{total}] {name}").format(done=done, total=total, name=name)
+        if seconds >= 3 and self.running:
+            text += "  " + _("({seconds} s …)").format(seconds=seconds)
+        self.status.setText(text)
 
     def _on_result(self, result: Result) -> None:
         self.counts[result.status] = self.counts.get(result.status, 0) + 1
@@ -445,6 +474,8 @@ class AutoTagDialog(QDialog):
         self.bar.setValue(self.bar.value() + 1)
 
     def _on_finished(self) -> None:
+        self._tick.stop()
+        self._current = None
         if self.thread:
             self.thread.quit()
             self.thread.wait(3000)
@@ -471,12 +502,35 @@ class AutoTagDialog(QDialog):
         self.btn_close.setFocus()
 
     def reject(self) -> None:
-        if self.running:
-            return  # waehrend des Laufs nur ueber "Abbrechen"
+        """Esc und das Fensterkreuz brechen ab und schliessen - immer."""
+        self._detach_worker()
         super().reject()
 
     def closeEvent(self, event):  # noqa: N802
-        if self.running:
-            event.ignore()
-            return
+        self._detach_worker()
         super().closeEvent(event)
+
+    def _detach_worker(self) -> None:
+        """Lauf abbrechen und den Thread ausklinken, ohne zu blockieren.
+
+        Kurz warten reicht meistens; haengt eine Netzabfrage laenger, wird der
+        Thread beim Elternfenster geparkt und raeumt sich selbst auf. Auf ihn zu
+        warten wuerde das Fenster erneut einfrieren - genau das soll es nicht.
+        """
+        if not self.running:
+            return
+        if self.worker:
+            self.worker.stop()
+        thread = self.thread
+        thread.quit()
+        if not thread.wait(400):
+            parent = self.parent()
+            if parent is not None:
+                pending = getattr(parent, "_pending_threads", None)
+                if pending is None:
+                    pending = parent._pending_threads = []
+                pending.append((thread, self.worker))
+                thread.finished.connect(
+                    lambda t=thread, w=self.worker: pending.remove((t, w))
+                    if (t, w) in pending else None)
+        self.thread = self.worker = None

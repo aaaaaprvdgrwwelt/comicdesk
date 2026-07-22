@@ -151,6 +151,8 @@ DE = {
         "Die Comic-Dateien selbst bleiben unangetastet.",
     "AniList als Ergaenzung benutzen": "AniList als Ergänzung benutzen",
     "ergaenzt durch {sources}": "ergänzt durch {sources}",
+    "Wird abgebrochen …": "Wird abgebrochen …",
+    "abgebrochen": "abgebrochen",
     "Von Hand": "Von Hand",
     "Quelle unbekannt": "Quelle unbekannt",
     "Nicht getaggt": "Nicht getaggt",
@@ -511,6 +513,11 @@ EN = {
     "Wird nach der laufenden Datei beendet …":
         "Stopping after the current file …",
     "Fertig. {summary}": "Done. {summary}",
+    "Wird abgebrochen …": "Cancelling …",
+    "Abbruch – die laufende Datei wird noch beendet.":
+        "Cancelling - the current file is still being finished.",
+    "({seconds} s …)": "({seconds} s …)",
+    "abgebrochen": "cancelled",
     "Fertig – {count} getaggt": "Done – {count} tagged",
     "Fertig – nichts geändert": "Done – nothing changed",
     "Fertig.": "Done.",

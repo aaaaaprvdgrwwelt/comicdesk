@@ -1124,7 +1124,24 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------
     def closeEvent(self, event):  # noqa: N802
         self._store_session()
+        self._stop_pending_threads()
         super().closeEvent(event)
+
+    def _stop_pending_threads(self) -> None:
+        """Abgebrochene Tag-Laeufe beenden, bevor Qt ihre Threads einsammelt.
+
+        Sonst stuerzt Qt beim Beenden ab ("QThread: Destroyed while thread is
+        still running"). Gewartet wird begrenzt - haengt eine Netzabfrage noch,
+        soll das Schliessen trotzdem durchgehen.
+        """
+        pending = getattr(self, "_pending_threads", [])
+        for thread, worker in list(pending):
+            if worker is not None:
+                worker.stop()
+        for thread, _worker in list(pending):
+            thread.quit()
+            thread.wait(3000)
+        pending.clear()
 
     def _store_session(self) -> None:
         """Sofort auf Platte schreiben - ein Absturz soll nichts kosten."""
