@@ -8,7 +8,9 @@ from PySide6.QtCore import QSettings
 from PySide6.QtCore import (
     QObject, QRunnable, Qt, QThread, QThreadPool, Signal, Slot,
 )
-from PySide6.QtGui import QAction, QImage, QKeySequence, QPixmap
+from PySide6.QtGui import (
+    QAction, QColor, QFont, QImage, QKeySequence, QPainter, QPen, QPixmap,
+)
 from PySide6.QtWidgets import (
     QLabel, QMainWindow, QMessageBox, QScrollArea, QSizePolicy, QSplitter,
     QTextBrowser, QToolBar, QVBoxLayout, QWidget,
@@ -120,6 +122,8 @@ class ReaderWindow(QMainWindow):
         #: sind. Geschrieben wird beim Schliessen, nicht pro Seite - sonst
         #: wuerde das Archiv jedes Mal neu geschrieben.
         self._store: PageStore | None = None
+        #: Blasen der angezeigten Seite - fuer die Nummern auf dem Bild.
+        self._bubbles: list = []
 
         self._build_actions()
         self.statusBar().showMessage(_("Laedt ..."))
@@ -170,6 +174,9 @@ class ReaderWindow(QMainWindow):
     def toggle_translation(self) -> None:
         show = self.a_translate.isChecked()
         self.translation_side.setVisible(show)
+        if not show:
+            self._bubbles = []
+            self._rescale()
         if show:
             if self.split.sizes()[1] < 100:
                 total = sum(self.split.sizes()) or self.width()
@@ -188,10 +195,6 @@ class ReaderWindow(QMainWindow):
         index = self.index
         self.translation_title.setText(
             _("Seite {number}").format(number=index + 1))
-        if index in self._tr_pages:
-            self._show_bubbles(self._tr_pages[index])
-            return
-
         settings = TranslationSettings.load(QSettings("comicdesk", "comicdesk"))
         try:
             data = self.comic.page_bytes(index)
@@ -207,6 +210,12 @@ class ReaderWindow(QMainWindow):
             return
 
         translator = settings.build()
+        try:
+            translator.right_to_left = (
+                (self.comic.read_metadata().manga or "").lower()
+                == "yesandrighttoleft")
+        except Exception:  # noqa: BLE001
+            pass
         ok, why = translator.available()
         if not ok:
             self.translation_view.setPlainText(
@@ -252,6 +261,8 @@ class ReaderWindow(QMainWindow):
                   "werden:\n{error}").format(error=exc))
 
     def _show_bubbles(self, bubbles) -> None:
+        self._bubbles = list(bubbles or [])
+        self._rescale()
         if not bubbles:
             self.translation_view.setPlainText(_("Kein Text auf dieser Seite."))
             return
@@ -303,6 +314,7 @@ class ReaderWindow(QMainWindow):
         if not self.comic:
             return
         self.index = index
+        self._bubbles = []
         self.statusBar().showMessage(
             _("Seite {index} / {total}  –  {name}").format(
                 index=index + 1, total=self.comic.page_count,
@@ -335,9 +347,37 @@ class ReaderWindow(QMainWindow):
             scaled = pm.scaledToWidth(max(1, vp.width()), Qt.SmoothTransformation)
         else:
             scaled = pm
+        if self._bubbles and self.a_translate.isChecked():
+            scaled = self._with_markers(scaled)
         self.label.setPixmap(scaled)
         self.label.resize(scaled.size())
         self.scroll.setWidgetResizable(self.fit_mode == FIT_PAGE)
+
+    def _with_markers(self, pixmap: QPixmap) -> QPixmap:
+        """Nummerierte Marker auf die Seite - erst dadurch sagt die Nummer im
+        Panel etwas darueber aus, wo der Text steht."""
+        marked = QPixmap(pixmap)
+        painter = QPainter(marked)
+        painter.setRenderHint(QPainter.Antialiasing)
+        radius = max(11, round(min(marked.width(), marked.height()) * 0.022))
+        font = QFont()
+        font.setBold(True)
+        font.setPixelSize(round(radius * 1.15))
+        painter.setFont(font)
+        for number, bubble in enumerate(self._bubbles, 1):
+            center = bubble.center
+            if center is None:
+                continue
+            x = round(center[0] / 100 * marked.width())
+            y = round(center[1] / 100 * marked.height())
+            painter.setPen(QPen(QColor(255, 255, 255, 230), 2))
+            painter.setBrush(QColor(20, 20, 30, 210))
+            painter.drawEllipse(x - radius, y - radius, radius * 2, radius * 2)
+            painter.setPen(QColor(255, 255, 255))
+            painter.drawText(x - radius, y - radius, radius * 2, radius * 2,
+                             Qt.AlignCenter, str(number))
+        painter.end()
+        return marked
 
     def resizeEvent(self, event):  # noqa: N802
         super().resizeEvent(event)

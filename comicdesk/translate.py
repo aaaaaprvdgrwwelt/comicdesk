@@ -25,7 +25,7 @@ from .i18n import _
 from .archive import TRANSLATIONS_NAME
 
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
-DEFAULT_MODEL = "google/gemini-2.5-flash-lite"
+DEFAULT_MODEL = "google/gemini-3.1-flash-lite"
 #: Groessere Seiten kosten Token, ohne dass die Erkennung besser wird.
 MAX_EDGE = 1400
 TIMEOUT = 120
@@ -49,11 +49,15 @@ not speak. Extract every piece of text on the page and translate it.
 Return ONLY a JSON array, no prose, no code fences. One object per text
 element, in natural reading order for this comic's language and layout:
 
-[{{"order": 1, "kind": "speech", "speaker": "", "original": "...",
-   "translation": "..."}}]
+[{{"order": 1, "kind": "speech", "speaker": "",
+   "box": {{"left": 12.5, "top": 4.0, "right": 31.0, "bottom": 11.5}},
+   "original": "...", "translation": "..."}}]
 
 Rules:
 - "kind" is one of: speech, thought, caption, sfx, sign
+- "box" uses NAMED keys left/top/right/bottom, each a percentage of the page
+  from 0 to 100, measured from the top-left corner. Do not use a plain array
+  and do not use a 0-1000 scale.
 - "original" is the text exactly as printed, keeping line breaks as spaces
 - "translation" is that text in {language}, natural and idiomatic, keeping
   the tone (shouting stays shouting, slang stays slang)
@@ -71,10 +75,98 @@ class Bubble:
     original: str
     translation: str
     speaker: str = ""
+    #: [links, oben, rechts, unten] in Prozent der Seite, oder None.
+    box: list[float] | None = None
 
     @property
     def kind_label(self) -> str:
         return KINDS.get(self.kind, self.kind)
+
+    @property
+    def center(self) -> tuple[float, float] | None:
+        if not self.box:
+            return None
+        x0, y0, x1, y1 = self.box
+        return ((x0 + x1) / 2, (y0 + y1) / 2)
+
+
+def _plausible(box: list[float]) -> bool:
+    x0, y0, x1, y1 = box
+    return (x1 > x0 and y1 > y0
+            and all(-2 <= v <= 102 for v in box)
+            and (x1 - x0) <= 98 and (y1 - y0) <= 98)
+
+
+def _clean_box(value) -> list[float] | None:
+    """Rahmen vereinheitlichen.
+
+    Benannte Schluessel sind eindeutig; kommt doch eine Liste, ist die
+    Reihenfolge Auslegungssache - Gemini etwa liefert von sich aus
+    [ymin, xmin, ymax, xmax] auf einer 0-1000-Skala. Deshalb wird die Skala
+    aus der Groessenordnung erschlossen und beide Achsenreihenfolgen
+    ausprobiert; passt keine, wird der Rahmen verworfen statt geraten.
+    """
+    numbers: list[float]
+    if isinstance(value, dict):
+        try:
+            numbers = [float(value[k]) for k in ("left", "top", "right", "bottom")]
+        except (KeyError, TypeError, ValueError):
+            return None
+        varianten = [numbers]
+    elif isinstance(value, (list, tuple)) and len(value) == 4:
+        try:
+            numbers = [float(v) for v in value]
+        except (TypeError, ValueError):
+            return None
+        varianten = [numbers, [numbers[1], numbers[0], numbers[3], numbers[2]]]
+    else:
+        return None
+
+    faktor = 0.1 if max(abs(n) for n in numbers) > 100 else 1.0
+    for kandidat in varianten:
+        box = [round(n * faktor, 2) for n in kandidat]
+        if box[2] < box[0]:
+            box[0], box[2] = box[2], box[0]
+        if box[3] < box[1]:
+            box[1], box[3] = box[3], box[1]
+        if _plausible(box):
+            return [max(0.0, box[0]), max(0.0, box[1]),
+                    min(100.0, box[2]), min(100.0, box[3])]
+    return None
+
+
+def reading_order(bubbles: list[Bubble], right_to_left: bool = False
+                  ) -> list[Bubble]:
+    """Nach Lage sortieren statt der Nummerierung des Modells zu vertrauen.
+
+    Zeilenweise von oben nach unten, innerhalb einer Zeile von links nach
+    rechts - bei Manga umgekehrt. Fehlt auch nur ein Rahmen, bleibt die
+    Reihenfolge des Modells stehen; halb geraten waere schlechter als gar
+    nicht.
+    """
+    if not bubbles or any(b.box is None for b in bubbles):
+        return bubbles
+    hoehen = sorted(b.box[3] - b.box[1] for b in bubbles)
+    toleranz = max(3.0, hoehen[len(hoehen) // 2] * 0.7)
+
+    rest = sorted(bubbles, key=lambda b: b.box[1])
+    zeilen: list[list[Bubble]] = []
+    for bubble in rest:
+        oben = bubble.box[1]
+        for zeile in zeilen:
+            if abs(oben - zeile[0].box[1]) <= toleranz:
+                zeile.append(bubble)
+                break
+        else:
+            zeilen.append([bubble])
+
+    sortiert: list[Bubble] = []
+    for zeile in zeilen:
+        zeile.sort(key=lambda b: b.box[0], reverse=right_to_left)
+        sortiert += zeile
+    for position, bubble in enumerate(sortiert, 1):
+        bubble.order = position
+    return sortiert
 
 
 class TranslationError(RuntimeError):
@@ -142,6 +234,7 @@ def _parse(text: str) -> list[Bubble]:
             original=original,
             translation=translation,
             speaker=str(item.get("speaker") or "").strip(),
+            box=_clean_box(item.get("box")),
         ))
     bubbles.sort(key=lambda b: b.order)
     return bubbles
@@ -210,10 +303,11 @@ class PageStore:
 
 class Translator:
     def __init__(self, api_key: str, model: str = DEFAULT_MODEL,
-                 language: str = "Deutsch"):
+                 language: str = "Deutsch", right_to_left: bool = False):
         self.api_key = (api_key or "").strip()
         self.model = model or DEFAULT_MODEL
         self.language = language or "Deutsch"
+        self.right_to_left = right_to_left
         self._session = requests.Session()
 
     def available(self) -> tuple[bool, str]:
@@ -261,4 +355,5 @@ class Translator:
             raise TranslationError(
                 _("OpenRouter lieferte keine Antwort: {error}").format(
                     error=str(data.get("error") or "")[:200]))
-        return _parse(choices[0].get("message", {}).get("content") or "")
+        bubbles = _parse(choices[0].get("message", {}).get("content") or "")
+        return reading_order(bubbles, self.right_to_left)

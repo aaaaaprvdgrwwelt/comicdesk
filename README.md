@@ -113,6 +113,12 @@ werden vor dem Senden auf 1400 px verkleinert — spart Token, ohne der
 Erkennung zu schaden. Eine Seite liegt je nach Modell bei Bruchteilen eines
 Cents.
 
+Das Modell liefert zu jeder Textstelle einen **Rahmen**; daraus berechnet
+ComicDesk die Lesereihenfolge selbst (zeilenweise von oben, innerhalb einer
+Zeile links nach rechts — bei als Manga getaggten Comics umgekehrt) und
+zeichnet nummerierte Marker auf die Seite, passend zur Liste daneben. Fehlt
+auch nur ein Rahmen, bleibt die Reihenfolge des Modells stehen.
+
 **Die Übersetzungen liegen beim Comic**, nicht in einem lokalen Cache: bei CBZ
 als `comicdesk-translations.json` im Archiv, bei den übrigen Formaten als
 Datei daneben. Wer die Sammlung von mehreren Rechnern aus liest, hat sie
