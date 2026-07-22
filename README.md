@@ -163,8 +163,10 @@ Für CBR/CB7 wird das `7z`-Kommando gebraucht:
 
 ## Sammlungen
 
-Die Sammlung wählst du oben in der Leiste — sie springt in deren Ordner und
-begrenzt zugleich die Suche darauf; „Alle Sammlungen" sucht überall. Der
+Die Sammlung wählst du oben in der Leiste oder im Ordnerbaum — beides ist
+gekoppelt: Wer in „Kinder" blättert, sucht auch in „Kinder". Außerhalb aller
+Sammlungen stellt sich der Bereich auf „Alle Sammlungen" zurück, damit die
+Anzeige keine Einschränkung behauptet, die zum Ort nicht passt. Der
 letzte Eintrag der Liste führt zur Verwaltung, ebenso *Extras → Sammlungen …*
 (`Strg+Umschalt+M`).
 

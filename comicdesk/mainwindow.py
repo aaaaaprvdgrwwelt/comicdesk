@@ -637,6 +637,7 @@ class MainWindow(QMainWindow):
             self.tree.scrollTo(idx)
             self.tree.expand(idx)
         self.settings.setValue("last_dir", str(path))
+        self._sync_collection_to(path)
         self.refresh()
         self._update_favorite_action()
 
@@ -1174,6 +1175,30 @@ class MainWindow(QMainWindow):
             self._go_to_collection(self.active_collection)
             return
         self.refresh()
+
+    def _sync_collection_to(self, path: Path) -> None:
+        """Beim Navigieren den Suchbereich mitziehen.
+
+        Wer in "Kinder" blaettert, meint mit einer Suche meistens auch
+        "Kinder". Ausserhalb aller Sammlungen wird auf "Alle Sammlungen"
+        zurueckgestellt, damit die Anzeige nicht eine Einschraenkung behauptet,
+        die zum Ort nicht passt.
+        """
+        box = getattr(self, "collection_box", None)
+        if box is None:
+            return
+        wanted = self.index.collection_for(path) or ""
+        if box.currentData() == wanted:
+            return
+        position = box.findData(wanted)
+        if position < 0:
+            return
+        box.blockSignals(True)
+        box.setCurrentIndex(position)
+        box.blockSignals(False)
+        self.settings.setValue("active_collection", wanted)
+        if self.search_mode:
+            self.refresh()
 
     def _go_to_collection(self, name: str | None) -> None:
         entry = self.index.collection(name) if name else None
