@@ -52,9 +52,14 @@ def build_query(path: Path, md: GenericMetadata, cover: bytes | None) -> SearchQ
     """Was wir ueber das Heft wissen - Tags schlagen Dateinamen."""
     parser = FileNameParser()
     parser.parse_filename(path.name)
+    nummer = (parser.issue or "").strip()
+    # "3 Sekunden (2012).cbz" hat keine Heftnummer - der Parser nimmt dann die
+    # Jahreszahl aus der Klammer. Danach zu suchen findet garantiert nichts.
+    if nummer and nummer == (parser.year or "").strip():
+        nummer = ""
     return SearchQuery(
         series=(md.series or parser.series or "").strip(),
-        issue=(md.issue or parser.issue or "").strip() or None,
+        issue=(md.issue or nummer).strip() or None,
         year=md.year or (int(parser.year) if str(parser.year).isdigit() else None),
         publisher=md.publisher,
         cover=cover,

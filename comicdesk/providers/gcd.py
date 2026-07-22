@@ -27,6 +27,10 @@ from .base import (
 # gcd_story.type_id 19 == "cover"-freie Hauptgeschichte laut GCD-Schema
 STORY_TYPE_MAIN = 19
 
+#: GCD kennzeichnet nummernlose Ausgaben so - Einzelalben, Sonderbaende.
+#: Ortsueblich tragen die lokal die Nummer 1, danach wird also auch gesucht.
+NO_NUMBER = "[nn]"
+
 CREDIT_MAP = {
     "script": "Writer",
     "pencils": "Penciller",
@@ -246,17 +250,21 @@ class GcdProvider(MetadataProvider):
                 (series_id,)).fetchall()
         # Grob in SQL vorfiltern (Serien koennen tausende Hefte haben), dann
         # exakt vergleichen - "007", "#7" und "7" sollen dasselbe treffen.
+        # [nn] muss mit durch, sonst faellt jedes Einzelalbum heraus.
         rows = con.execute(
             f"SELECT {columns} FROM gcd_issue "  # noqa: S608
             "WHERE series_id = ? AND variant_of_id IS NULL "
-            "AND (number = ? OR number LIKE ?)",
-            (series_id, wanted, f"%{wanted}%")).fetchall()
-        return [r for r in rows if normalize_issue(r["number"]) == wanted]
+            "AND (number = ? OR number LIKE ? OR number = ?)",
+            (series_id, wanted, f"%{wanted}%", NO_NUMBER)).fetchall()
+        return [r for r in rows if _issue_matches(r["number"], wanted)]
 
     def _to_candidate(self, series: sqlite3.Row, issue: sqlite3.Row) -> Candidate:
         md = GenericMetadata()
         md.series = series["series_name"]
-        md.issue = (issue["number"] or "").strip() or None
+        nummer = (issue["number"] or "").strip()
+        if nummer == NO_NUMBER:
+            nummer = "1"   # nummernloses Album - lokal heisst das ueblich 1
+        md.issue = nummer or None
         md.title = (issue["title"] or "").strip() or None
         md.publisher = series["publisher"]
         md.issue_count = series["issue_count"]
@@ -272,7 +280,7 @@ class GcdProvider(MetadataProvider):
             source=self.name,
             metadata=md,
             series_name=series["series_name"] or "",
-            issue_number=str(issue["number"] or ""),
+            issue_number=nummer,
             year=year,
             publisher=series["publisher"],
         )
@@ -355,6 +363,14 @@ class GcdProvider(MetadataProvider):
             if role and person and (person, role) not in seen:
                 seen.add((person, role))
                 yield person, role
+
+
+def _issue_matches(number, wanted: str) -> bool:
+    """Nummer aus der GCD mit der gesuchten vergleichen."""
+    roh = (number or "").strip()
+    if roh == NO_NUMBER:
+        return wanted in ("1", "0")
+    return normalize_issue(roh) == wanted
 
 
 def _sort_key(text: str):
