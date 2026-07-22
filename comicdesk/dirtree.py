@@ -19,7 +19,8 @@ COLLECTION, DIRECTORY, FILESYSTEM = range(3)
 
 
 class Node:
-    __slots__ = ("kind", "label", "path", "roots", "parent", "children", "row")
+    __slots__ = ("kind", "label", "path", "roots", "parent", "children", "row",
+                 "nid")
 
     def __init__(self, kind: int, label: str, path: Path | None = None,
                  roots: list[Path] | None = None, parent: "Node | None" = None,
@@ -30,6 +31,7 @@ class Node:
         self.roots = roots or []
         self.parent = parent
         self.row = row
+        self.nid = 0
         #: None heisst: noch nicht geladen.
         self.children: list[Node] | None = None
 
@@ -59,10 +61,18 @@ class DirTreeModel(QAbstractItemModel):
         super().__init__(parent)
         self._root = Node(DIRECTORY, "", None)
         self._root.children = []
+        #: Ein QModelIndex haelt keine Referenz auf sein Objekt. Steckte hier
+        #: der Knoten als Zeiger, laese ein nach einem Reset weiterbenutzter
+        #: Index in freigegebenen Speicher - das stuerzt ab, statt eine
+        #: Ausnahme zu werfen. Ueber eine nie wiederverwendete Nummer laeuft
+        #: derselbe Zugriff hoechstens ins Leere.
+        self._nodes: dict[int, Node] = {}
+        self._next_id = 0
 
     # --- Aufbau -------------------------------------------------------
     def set_collections(self, collections, show_filesystem: bool = True) -> None:
         self.beginResetModel()
+        self._nodes.clear()
         children: list[Node] = []
         for entry in collections:
             paths = [Path(r) for r in entry.roots]
@@ -77,31 +87,47 @@ class DirTreeModel(QAbstractItemModel):
         self.endResetModel()
 
     # --- Qt-Schnittstelle ---------------------------------------------
-    def _node(self, index: QModelIndex) -> Node:
-        return index.internalPointer() if index.isValid() else self._root
+    def _node(self, index: QModelIndex) -> Node | None:
+        """Knoten zum Index, oder None wenn der Index veraltet ist."""
+        if not index.isValid():
+            return self._root
+        return self._nodes.get(index.internalId())
+
+    def _make_index(self, row: int, node: Node) -> QModelIndex:
+        if not node.nid:
+            self._next_id += 1
+            node.nid = self._next_id
+        self._nodes[node.nid] = node
+        return self.createIndex(row, 0, node.nid)
 
     def columnCount(self, parent=QModelIndex()) -> int:  # noqa: N802
         return 1
 
     def rowCount(self, parent=QModelIndex()) -> int:  # noqa: N802
         node = self._node(parent)
-        return len(node.children) if node.children is not None else 0
+        if node is None or node.children is None:
+            return 0
+        return len(node.children)
 
     def index(self, row: int, column: int, parent=QModelIndex()) -> QModelIndex:
         node = self._node(parent)
-        if node.children is None or not 0 <= row < len(node.children):
+        if node is None or node.children is None:
             return QModelIndex()
-        return self.createIndex(row, column, node.children[row])
+        if not 0 <= row < len(node.children):
+            return QModelIndex()
+        return self._make_index(row, node.children[row])
 
     def parent(self, index: QModelIndex) -> QModelIndex:  # noqa: A003
         node = self._node(index)
-        parent = node.parent
+        parent = node.parent if node is not None else None
         if parent is None or parent is self._root:
             return QModelIndex()
-        return self.createIndex(parent.row, 0, parent)
+        return self._make_index(parent.row, parent)
 
     def hasChildren(self, parent=QModelIndex()) -> bool:  # noqa: N802
         node = self._node(parent)
+        if node is None:
+            return False
         if node.children is not None:
             return bool(node.children)
         # Noch nicht geladen: Aufklapppfeil anbieten. Ist der Ordner leer,
@@ -109,11 +135,12 @@ class DirTreeModel(QAbstractItemModel):
         return bool(node.sources)
 
     def canFetchMore(self, parent=QModelIndex()) -> bool:  # noqa: N802
-        return self._node(parent).children is None
+        node = self._node(parent)
+        return node is not None and node.children is None
 
     def fetchMore(self, parent=QModelIndex()) -> None:  # noqa: N802
         node = self._node(parent)
-        if node.children is not None:
+        if node is None or node.children is not None:
             return
         folders: list[Path] = []
         if node.kind == COLLECTION and node.path is None:
@@ -131,9 +158,9 @@ class DirTreeModel(QAbstractItemModel):
         self.endInsertRows()
 
     def data(self, index: QModelIndex, role=Qt.DisplayRole):
-        if not index.isValid():
+        node = self._node(index) if index.isValid() else None
+        if node is None:
             return None
-        node = self._node(index)
         if role == Qt.DisplayRole:
             return node.label
         if role == Qt.ToolTipRole:
@@ -150,8 +177,8 @@ class DirTreeModel(QAbstractItemModel):
 
     # --- Hilfen fuer das Hauptfenster ---------------------------------
     def path_at(self, index: QModelIndex) -> Path | None:
-        node = self._node(index)
-        return node.path if index.isValid() else None
+        node = self._node(index) if index.isValid() else None
+        return node.path if node is not None else None
 
     def collection_at(self, index: QModelIndex) -> str | None:
         """Zu welcher Sammlung gehoert dieser Eintrag?"""
@@ -177,7 +204,7 @@ class DirTreeModel(QAbstractItemModel):
     def _index_of(self, node: Node) -> QModelIndex:
         if node.parent is None:
             return QModelIndex()
-        return self.createIndex(node.row, 0, node)
+        return self._make_index(node.row, node)
 
     def _descend(self, index: QModelIndex, node: Node, target: Path) -> QModelIndex:
         if node.path is not None and node.path == target:
@@ -196,8 +223,8 @@ class DirTreeModel(QAbstractItemModel):
     def refresh(self, index: QModelIndex) -> None:
         """Kinder eines Eintrags verwerfen, damit sie neu gelesen werden."""
         node = self._node(index)
-        if node.children is None:
-            return
+        if node is None or node.children is None:
+            return          # unbekannt (Index von vor einem Reset) oder leer
         if node.children:
             self.beginRemoveRows(index, 0, len(node.children) - 1)
             node.children = None

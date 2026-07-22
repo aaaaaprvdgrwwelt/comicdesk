@@ -842,24 +842,22 @@ class MainWindow(QMainWindow):
         add("In Sammlung verschieben …",
             lambda: self.move_to_collection(folder), "folder")
         add("Neuer Ordner …", lambda: self._new_folder_in(folder), "folder_new")
-        add("Umbenennen …", lambda: self._rename_folder(folder, index), "rename")
+        add("Umbenennen …", lambda: self._rename_folder(folder), "rename")
         add("Nach Serie benennen …",
-            lambda: self._rename_folder_by_tags(folder, index), "rename")
+            lambda: self._rename_folder_by_tags(folder), "rename")
         menu.addSeparator()
         add("Aktualisieren", lambda: self._reload_tree(index), "refresh")
         return menu
 
-    def _rename_folder(self, folder: Path, index: QModelIndex) -> None:
+    def _rename_folder(self, folder: Path) -> None:
         name, ok = QInputDialog.getText(
             self, _("Umbenennen"), _("Neuer Name:"), QLineEdit.Normal, folder.name)
         name = name.strip()
         if not ok or not name or name == folder.name:
             return
-        parent = index.parent()
-        if self._do_rename(folder, folder.parent / name):
-            self._reload_tree(parent if parent.isValid() else index)
+        self._rename_and_select(folder, folder.parent / name)
 
-    def _rename_folder_by_tags(self, folder: Path, index: QModelIndex) -> None:
+    def _rename_folder_by_tags(self, folder: Path) -> None:
         """Ordner nach der Serie seiner Comics benennen.
 
         ComicTagger kennt das nicht - es leitet den Zielpfad je Datei neu her
@@ -902,9 +900,21 @@ class MainWindow(QMainWindow):
         name = name.strip()
         if not ok or not name or name == folder.name:
             return
-        parent = index.parent()
-        if self._do_rename(folder, folder.parent / name):
-            self._reload_tree(parent if parent.isValid() else index)
+        self._rename_and_select(folder, folder.parent / name)
+
+    def _rename_and_select(self, folder: Path, ziel: Path) -> None:
+        """Umbenennen und danach frisch im Baum aufsuchen.
+
+        _do_rename baut den Baum ueber reload_tree_roots neu auf. Jeder vorher
+        geholte QModelIndex zeigt danach auf einen freigegebenen Knoten - ihn
+        weiterzubenutzen stuerzt ab.
+        """
+        if not self._do_rename(folder, ziel):
+            return
+        neu = self.tree_model.index_for(ziel)
+        if neu.isValid():
+            self.tree.setCurrentIndex(neu)
+            self.tree.scrollTo(neu)
 
     def _set_favorite(self, folder: Path, add: bool) -> None:
         if add:
