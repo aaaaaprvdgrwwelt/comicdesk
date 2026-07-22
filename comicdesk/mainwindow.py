@@ -6,6 +6,7 @@ from pathlib import Path
 
 from PySide6.QtCore import (
     QAbstractListModel, QDir, QModelIndex, QRect, QSettings, QSize, Qt,
+    QTimer,
 )
 from PySide6.QtGui import (
     QAction, QColor, QFont, QIcon, QKeySequence, QPainter, QPen, QPixmap,
@@ -240,6 +241,14 @@ class MainWindow(QMainWindow):
 
         self.loader = ThumbLoader(self)
         self.index = CollectionIndex()
+        # Das Lesen der Tags geht auf die Datei - auf Netzlaufwerken kostet
+        # das bis zu 200 ms. Ohne Verzoegerung friert das Fenster bei jedem
+        # Klick ein und schnelle Klickfolgen (Klick, Shift-Klick) geraten
+        # durcheinander.
+        self._meta_timer = QTimer(self)
+        self._meta_timer.setSingleShot(True)
+        self._meta_timer.setInterval(150)
+        self._meta_timer.timeout.connect(self._load_metadata_now)
         self.favorites = Favorites()
         self._build_ui()
         self._build_actions()
@@ -602,8 +611,18 @@ class MainWindow(QMainWindow):
 
     def _selection_changed(self, *_args) -> None:
         paths = [p for p in self.selected_paths() if p.is_file()]
-        self.meta.load(paths[0] if len(paths) == 1 else None)
+        if len(paths) == 1:
+            # Erst wenn die Auswahl steht, sonst liest jeder Zwischenschritt
+            # einer Mehrfachauswahl unnoetig eine Datei.
+            self._meta_timer.start()
+        else:
+            self._meta_timer.stop()
+            self.meta.clear()
         self._update_favorite_action()
+
+    def _load_metadata_now(self) -> None:
+        paths = [p for p in self.selected_paths() if p.is_file()]
+        self.meta.load(paths[0] if len(paths) == 1 else None)
 
     def _tree_selected(self, index: QModelIndex) -> None:
         if not index.isValid():
