@@ -465,51 +465,6 @@ EN = {
     "{count} verschwundene Favoriten entfernt.":
         "{count} missing favourites removed.",
 
-    # --- Uebersetzung
-    "Übersetzung": "Translation",
-    "OpenRouter-Schlüssel": "OpenRouter key",
-    "Schlüssel von openrouter.ai/keys": "Key from openrouter.ai/keys",
-    "Modell": "Model",
-    "Übersetzen nach": "Translate into",
-    "Der Reader kann eine Seite an ein Bildmodell schicken und die "
-    "Sprechblasen im Original und übersetzt daneben anzeigen. Die Comicdatei "
-    "wird dabei nicht verändert. Eine Seite kostet je nach Modell Bruchteile "
-    "eines Cents; Antworten werden dauerhaft zwischengespeichert.":
-        "The reader can send a page to a vision model and show the speech "
-        "bubbles beside it, original and translated. The comic file is not "
-        "modified. A page costs a fraction of a cent depending on the model; "
-        "answers are cached permanently.",
-    "Kein OpenRouter-Schlüssel hinterlegt.": "No OpenRouter key configured.",
-    "Einzutragen unter Extras › Einstellungen › Übersetzung.":
-        "Enter it under Tools › Settings › Translation.",
-    "Wird übersetzt …": "Translating …",
-    "Nochmal übersetzen": "Translate again",
-    "Fragt das Modell erneut und behält das vollständigere Ergebnis. Hilft, "
-    "wenn Sprechblasen fehlen.":
-        "Asks the model again and keeps the more complete result. Helps when "
-        "speech bubbles are missing.",
-    "Übersetzungen konnten nicht beim Comic gespeichert werden:\n{error}":
-        "Translations could not be stored with the comic:\n{error}",
-    "Kein Text auf dieser Seite.": "No text on this page.",
-    "Seite {number}": "Page {number}",
-    "Sprechblase": "Speech",
-    "Gedanke": "Thought",
-    "Textkasten": "Caption",
-    "Geräusch": "Sound effect",
-    "Schild": "Sign",
-    "Das Modell hat die Antwort abgebrochen ({reason}). Noch einmal "
-    "versuchen.":
-        "The model cut its answer short ({reason}). Try again.",
-    "Antwort des Modells war kein gültiges JSON.":
-        "The model's answer was not valid JSON.",
-    "OpenRouter lehnt den Schlüssel ab.": "OpenRouter rejected the key.",
-    "OpenRouter drosselt gerade – später erneut versuchen.":
-        "OpenRouter is rate limiting - try again later.",
-    "OpenRouter antwortete mit {code}: {text}":
-        "OpenRouter answered with {code}: {text}",
-    "OpenRouter lieferte keine Antwort: {error}":
-        "OpenRouter returned no answer: {error}",
-
     # --- Reader
     "Reader": "Reader",
     "◀ Zurueck": "◀ Back",

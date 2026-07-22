@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 
 from .autotag import Result, run_in_thread
 from .background import stop_and_detach
-from .config import TaggerSettings, TranslationSettings
+from .config import TaggerSettings
 from .i18n import LANGUAGES, _
 
 STATUS_COLORS = {
@@ -208,41 +208,10 @@ class SettingsDialog(QDialog):
         self.tabs.addTab(general, _("Allgemein"))
         self.tabs.setCurrentIndex(start_tab)
 
-        self._build_translation_tab()
-
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         outer.addWidget(buttons)
-
-    def _build_translation_tab(self) -> None:
-        from .translate import LANGUAGES
-
-        self.translation = TranslationSettings.load(self.settings)
-        page = QWidget()
-        form = QFormLayout(page)
-        self.tr_key = QLineEdit(self.translation.api_key)
-        self.tr_key.setEchoMode(QLineEdit.PasswordEchoOnEdit)
-        self.tr_key.setPlaceholderText(_("Schlüssel von openrouter.ai/keys"))
-        form.addRow(_("OpenRouter-Schlüssel"), self.tr_key)
-        self.tr_model = QLineEdit(self.translation.model)
-        form.addRow(_("Modell"), self.tr_model)
-        self.tr_language = QComboBox()
-        for label, _code in LANGUAGES:
-            self.tr_language.addItem(label)
-        position = self.tr_language.findText(self.translation.language)
-        self.tr_language.setCurrentIndex(max(0, position))
-        form.addRow(_("Übersetzen nach"), self.tr_language)
-        hint = QLabel(_(
-            "Der Reader kann eine Seite an ein Bildmodell schicken und die "
-            "Sprechblasen im Original und übersetzt daneben anzeigen. Die "
-            "Comicdatei wird dabei nicht verändert. Eine Seite kostet je nach "
-            "Modell Bruchteile eines Cents; Antworten werden dauerhaft "
-            "zwischengespeichert."))
-        hint.setWordWrap(True)
-        hint.setStyleSheet("color:gray;")
-        form.addRow(hint)
-        self.tabs.addTab(page, _("Übersetzung"))
 
     def _pick_db(self) -> None:
         path, _selected_filter = QFileDialog.getOpenFileName(
@@ -341,10 +310,6 @@ class SettingsDialog(QDialog):
         self.config.overwrite_existing = self.overwrite.isChecked()
         self.config.save(self.settings)
 
-        self.translation.api_key = self.tr_key.text().strip()
-        self.translation.model = self.tr_model.text().strip()
-        self.translation.language = self.tr_language.currentText()
-        self.translation.save(self.settings)
 
         chosen = self.language.currentData()
         if chosen != self._initial_language:

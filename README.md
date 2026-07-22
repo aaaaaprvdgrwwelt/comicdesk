@@ -99,40 +99,6 @@ sonstige Dateien im Archiv bleiben erhalten, `PageCount` wird angepasst.
 Das geht bei **CBZ** und **PDF**. CBR/CB7/CBT sind schreibgeschützt — erst
 „Nach CBZ konvertieren".
 
-**Übersetzen beim Lesen** (Taste `T` im Reader) — schickt die aktuelle Seite an
-ein Bildmodell über [OpenRouter](https://openrouter.ai) und zeigt die
-Sprechblasen daneben, im Original und übersetzt, in Lesereihenfolge. **Die
-Comicdatei wird nicht verändert** — der Text im Bild bleibt, wie er ist. Wer
-den Text tatsächlich im Bild ersetzen will, braucht Retusche und Satz; dafür
-sind [comic-translate](https://github.com/ogkalu2/comic-translate) oder
-[manga-image-translator](https://github.com/zyddnys/manga-image-translator) die
-richtigen Werkzeuge.
-
-Schlüssel und Modell unter *Extras → Einstellungen → Übersetzung*. Seiten
-werden vor dem Senden auf 1400 px verkleinert — spart Token, ohne der
-Erkennung zu schaden. Eine Seite liegt je nach Modell bei Bruchteilen eines
-Cents.
-
-Modelle übersehen gelegentlich eine Sprechblase — an einer Testseite lieferte
-dasselbe Modell in vier Läufen 2, 14, 14 und 14 Stellen. Deshalb gibt es im
-Panel **„Nochmal übersetzen"**: fragt erneut und behält das vollständigere
-Ergebnis. Die Temperatur steht auf 0, was die Schwankung dämpft, aber nicht
-beseitigt.
-
-Das Modell liefert zu jeder Textstelle einen **Rahmen**; daraus berechnet
-ComicDesk die Lesereihenfolge selbst (zeilenweise von oben, innerhalb einer
-Zeile links nach rechts — bei als Manga getaggten Comics umgekehrt) und
-zeichnet nummerierte Marker auf die Seite, passend zur Liste daneben. Fehlt
-auch nur ein Rahmen, bleibt die Reihenfolge des Modells stehen.
-
-**Die Übersetzungen liegen beim Comic**, nicht in einem lokalen Cache: bei CBZ
-als `comicdesk-translations.json` im Archiv, bei den übrigen Formaten als
-Datei daneben. Wer die Sammlung von mehreren Rechnern aus liest, hat sie
-überall. Geschrieben wird beim Schließen des Readers, nicht pro Seite — sonst
-würde das Archiv jedes Mal neu geschrieben. Geschlüsselt wird nach
-Bildinhalt statt nach Seitennummer, damit die Zuordnung das Umsortieren oder
-Löschen von Seiten übersteht.
-
 **Taggen** — rechte Seitenleiste, schreibt `ComicInfo.xml` ins Archiv
 (Standardformat, das auch Komet, Kavita, Komga, ComicRack und ComicTagger lesen).
 Freie Tags landen im `<Tags>`-Element. `Strg+S` speichert.
@@ -382,8 +348,7 @@ Quelle nicht füllt, und deine eigenen freien Tags bleiben erhalten.
 - `comicdesk/thumbs.py` – Cover-Thumbnails im Threadpool, Platten-Cache
 - `comicdesk/mainwindow.py` – Browser, Kachel-Delegate, Dateioperationen
 - `comicdesk/dirtree.py` – Ordnerbaum mit den Sammlungen als Wurzeln
-- `comicdesk/reader.py` – Lesefenster samt Übersetzungs-Seitenleiste
-- `comicdesk/translate.py` – OpenRouter-Anbindung für die Lesehilfe
+- `comicdesk/reader.py` – Lesefenster
 - `comicdesk/metapanel.py` – Tag-Editor
 - `comicdesk/pageeditor.py` – Seiten löschen und umsortieren
 - `comicdesk/favorites.py` – Favoritenliste (JSON)
