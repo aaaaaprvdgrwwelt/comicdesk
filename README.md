@@ -212,8 +212,28 @@ Liefert Cover-URLs — nur damit ist die Bild-Verifikation möglich.
 Die Grand Comics Database hat keine öffentliche API, stellt aber alle zwei
 Wochen **SQLite3-Dumps** bereit: <https://www.comics.org/download/> (Account
 nötig, Daten unter CC-BY). Datei herunterladen, im Dialog auswählen, einmal
-**„Indizes anlegen“** drücken — der Dump kommt fast ohne Indizes und ist ohne
-sie sehr langsam.
+**„Suche vorbereiten"** drücken.
+
+Das ist nicht optional. Der Dump bringt zwar Indizes mit, aber `LIKE '%…%'`
+kann keinen davon nutzen — SQLite scannt alle ~231.000 Serien. Gemessen an
+einem echten Dump (6,2 GB, Stand Juli 2026):
+
+| Serie suchen | Dauer |
+|---|---|
+| ohne Vorbereitung | 15.900 ms |
+| mit Volltextindex | **0,2 ms** |
+
+Der Aufbau dauert ~10 Sekunden und legt eine eigene 7-MB-Datei unter
+`~/.local/share/comicdesk/` an; der Dump selbst wird **nicht** verändert. Wird
+ein neuer Dump eingelegt, merkt ComicDesk das an Größe und Datum und der alte
+Index verfällt.
+
+**Den Dump auf eine lokale Platte legen.** Auf einer SMB-Freigabe war
+dieselbe Abfrage 15× langsamer, das Nachladen der Details sogar 5× — SQLite
+macht viele kleine wahlfreie Zugriffe, und genau das ist über Netz teuer.
+ComicDesk warnt im Einstellungsdialog, wenn der Pfad auf einem Netzlaufwerk
+liegt. Auf Netzlaufwerken wird die Datenbank mit `immutable=1` geöffnet, weil
+SQLite-Sperren über CIFS und NFS nicht zuverlässig funktionieren.
 
 Offline, kein Limit, und deutlich besser bei europäischen Verlagen (Ehapa,
 Carlsen, Splitter, Bastei), die ComicVine kaum erfasst. Über „Nur Sprache“

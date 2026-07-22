@@ -246,6 +246,29 @@ EN = {
     "CBZ konvertieren.":
         "Pages cannot be edited in {suffix}. Convert the file to CBZ first.",
 
+    # --- GCD-Volltextindex
+    "Suche vorbereiten": "Prepare search",
+    "Baut einen Volltextindex ueber die Serientitel. Einmalig noetig, dauert "
+    "etwa zehn Sekunden - ohne ihn dauert jede Suche im Dump mehrere "
+    "Sekunden. Der Dump selbst wird nicht veraendert.":
+        "Builds a full-text index over the series titles. Needed once, takes "
+        "about ten seconds - without it every lookup in the dump takes "
+        "several seconds. The dump itself is not modified.",
+    "Suche ist vorbereitet.": "Search is prepared.",
+    "Die Datenbank liegt auf einem Netzlaufwerk – Abfragen dauern dadurch ein "
+    "Vielfaches. Eine lokale Kopie ist deutlich schneller.":
+        "The database is on a network share, which makes queries many times "
+        "slower. A local copy is considerably faster.",
+    "Suche noch nicht vorbereitet – jede Abfrage dauert sonst mehrere "
+    "Sekunden.":
+        "Search not prepared yet - otherwise every query takes several "
+        "seconds.",
+    "Serientitel werden gelesen …": "Reading series titles …",
+    "Volltextindex wird aufgebaut …": "Building full-text index …",
+    "Fertig: {count} Serien durchsuchbar.":
+        "Done: {count} series searchable.",
+    "Vorbereiten fehlgeschlagen:\n{error}": "Preparation failed:\n{error}",
+
     # --- Sammlungen
     "Sammlungen": "Collections",
     "Sammlungen verwalten …": "Manage collections …",

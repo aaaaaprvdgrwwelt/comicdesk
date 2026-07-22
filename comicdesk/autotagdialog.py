@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QSettings
+from PySide6.QtCore import QObject, Qt, QSettings, QThread, Signal
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout,
@@ -27,6 +27,33 @@ STATUS_COLORS = {
 GCD_LANGUAGES = [("Alle Sprachen", ""), ("Deutsch", "de"), ("Englisch", "en"),
                  ("Franzoesisch", "fr"), ("Italienisch", "it"),
                  ("Spanisch", "es"), ("Niederlaendisch", "nl")]
+
+
+class _FtsWorker(QObject):
+    """Baut den GCD-Volltextindex im Hintergrund - der Dump kann riesig sein."""
+
+    progress = Signal(str, int)
+    finished = Signal(bool, str)
+
+    def __init__(self, db_path: str):
+        super().__init__()
+        self.db_path = db_path
+        self._stop = False
+
+    def stop(self) -> None:
+        self._stop = True
+
+    def run(self) -> None:
+        from .providers.gcd import GcdProvider
+
+        try:
+            provider = GcdProvider(self.db_path)
+            done = provider.build_fts(
+                progress=lambda text, pct: self.progress.emit(text, pct),
+                should_stop=lambda: self._stop)
+            self.finished.emit(done, "")
+        except Exception as exc:  # noqa: BLE001
+            self.finished.emit(False, str(exc))
 
 
 class SettingsDialog(QDialog):
@@ -76,12 +103,15 @@ class SettingsDialog(QDialog):
         self.gcd_path.setPlaceholderText(_("Pfad zur SQLite-Datei aus dem GCD-Dump"))
         browse = QPushButton(_("Waehlen …"))
         browse.clicked.connect(self._pick_db)
-        index_btn = QPushButton(_("Indizes anlegen"))
-        index_btn.setToolTip(_("Einmalig ausfuehren - beschleunigt die Suche erheblich."))
-        index_btn.clicked.connect(self._build_indexes)
+        self.fts_btn = QPushButton(_("Suche vorbereiten"))
+        self.fts_btn.setToolTip(_(
+            "Baut einen Volltextindex ueber die Serientitel. Einmalig noetig, "
+            "dauert etwa zehn Sekunden - ohne ihn dauert jede Suche im Dump "
+            "mehrere Sekunden. Der Dump selbst wird nicht veraendert."))
+        self.fts_btn.clicked.connect(self._build_fts)
         path_row.addWidget(self.gcd_path, 1)
         path_row.addWidget(browse)
-        path_row.addWidget(index_btn)
+        path_row.addWidget(self.fts_btn)
         self.gcd_lang = QComboBox()
         for label, code in GCD_LANGUAGES:
             self.gcd_lang.addItem(_(label), code)
@@ -98,6 +128,16 @@ class SettingsDialog(QDialog):
         gcd_hint.setWordWrap(True)
         gcd_hint.setStyleSheet("color:gray;")
         gcd_form.addRow(gcd_hint)
+        self.fts_status = QLabel()
+        self.fts_status.setWordWrap(True)
+        gcd_form.addRow(self.fts_status)
+        self.fts_bar = QProgressBar()
+        self.fts_bar.setVisible(False)
+        gcd_form.addRow(self.fts_bar)
+        self.gcd_path.textChanged.connect(lambda _t: self._refresh_fts_status())
+        self._fts_thread = None
+        self._fts_worker = None
+        self._refresh_fts_status()
         root.addWidget(gcd_box)
 
         rule_box = QGroupBox(_("Automatik"))
@@ -162,22 +202,79 @@ class SettingsDialog(QDialog):
         if path:
             self.gcd_path.setText(path)
 
-    def _build_indexes(self) -> None:
+    def _refresh_fts_status(self) -> None:
         from .providers.gcd import GcdProvider
 
-        provider = GcdProvider(self.gcd_path.text())
-        ok, why = provider.available()
-        if not ok:
-            QMessageBox.warning(self, _("GCD"), why)
+        path = self.gcd_path.text().strip()
+        if not path:
+            self.fts_status.clear()
+            self.fts_btn.setEnabled(False)
             return
-        try:
-            provider.ensure_indexes()
-        except Exception as exc:  # noqa: BLE001
+        provider = GcdProvider(path)
+        ok, why = provider.available()
+        self.fts_btn.setEnabled(ok)
+        if not ok:
+            self.fts_status.setText(why)
+            self.fts_status.setStyleSheet("color:#c07000;")
+            return
+        if provider.on_network:
+            self.fts_status.setText(_(
+                "Die Datenbank liegt auf einem Netzlaufwerk – Abfragen dauern "
+                "dadurch ein Vielfaches. Eine lokale Kopie ist deutlich "
+                "schneller."))
+            self.fts_status.setStyleSheet("color:#c07000;")
+            return
+        if provider.fts_ready:
+            self.fts_status.setText(_("Suche ist vorbereitet."))
+            self.fts_status.setStyleSheet("color:#2a7a44;")
+        else:
+            self.fts_status.setText(_(
+                "Suche noch nicht vorbereitet – jede Abfrage dauert sonst "
+                "mehrere Sekunden."))
+            self.fts_status.setStyleSheet("color:#c07000;")
+
+    def _build_fts(self) -> None:
+        if self._fts_thread is not None:
+            self._fts_worker.stop()
+            return
+        self._fts_thread = QThread()
+        self._fts_worker = _FtsWorker(self.gcd_path.text().strip())
+        self._fts_worker.moveToThread(self._fts_thread)
+        self._fts_thread.started.connect(self._fts_worker.run)
+        self._fts_worker.progress.connect(self._on_fts_progress)
+        self._fts_worker.finished.connect(self._on_fts_finished)
+        self.fts_bar.setRange(0, 100)
+        self.fts_bar.setValue(0)
+        self.fts_bar.setVisible(True)
+        self.fts_btn.setText(_("Abbrechen"))
+        self._fts_thread.start()
+
+    def _on_fts_progress(self, text: str, percent: int) -> None:
+        self.fts_status.setText(text)
+        self.fts_status.setStyleSheet("color:gray;")
+        self.fts_bar.setValue(percent)
+
+    def _on_fts_finished(self, done: bool, error: str) -> None:
+        if self._fts_thread:
+            self._fts_thread.quit()
+            self._fts_thread.wait(5000)
+        self._fts_thread = None
+        self._fts_worker = None
+        self.fts_bar.setVisible(False)
+        self.fts_btn.setText(_("Suche vorbereiten"))
+        if error:
             QMessageBox.critical(
                 self, _("GCD"),
-                _("Indizes fehlgeschlagen:\n{error}").format(error=exc))
-            return
-        QMessageBox.information(self, _("GCD"), _("Indizes sind angelegt."))
+                _("Vorbereiten fehlgeschlagen:\n{error}").format(error=error))
+        self._refresh_fts_status()
+
+    def closeEvent(self, event):  # noqa: N802
+        if self._fts_worker:
+            self._fts_worker.stop()
+        if self._fts_thread:
+            self._fts_thread.quit()
+            self._fts_thread.wait(5000)
+        super().closeEvent(event)
 
     def accept(self) -> None:
         self.config.use_comicvine = self.cv_enabled.isChecked()
