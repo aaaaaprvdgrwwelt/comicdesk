@@ -154,6 +154,27 @@ DE = {
     "Von Hand": "Von Hand",
     "Quelle unbekannt": "Quelle unbekannt",
     "Nicht getaggt": "Nicht getaggt",
+    "Cover-Aehnlichkeit {value}": "Cover-Ähnlichkeit {value}",
+    "AniList-Limit erreicht, bitte spaeter erneut.":
+        "AniList-Limit erreicht, bitte später erneut.",
+    "ComicVine-Kontingent erschoepft (200 Anfragen/Stunde). Spaeter "
+    "weitermachen - bereits geholte Daten sind gecacht.":
+        "ComicVine-Kontingent erschöpft (200 Anfragen/Stunde). Später "
+        "weitermachen – bereits geholte Daten sind gecacht.",
+    "Baut einen Volltextindex ueber die Serientitel. Einmalig noetig, dauert "
+    "etwa zehn Sekunden - ohne ihn dauert jede Suche im Dump mehrere "
+    "Sekunden. Der Dump selbst wird nicht veraendert.":
+        "Baut einen Volltextindex über die Serientitel. Einmalig nötig, dauert "
+        "etwa zehn Sekunden – ohne ihn dauert jede Suche im Dump mehrere "
+        "Sekunden. Der Dump selbst wird nicht verändert.",
+    "Kennt Manga-Serien, aber keine einzelnen Baende einer deutschen Ausgabe. "
+    "Bestimmt deshalb nie das Heft, sondern fuellt nur Luecken: Zeichner, "
+    "Autor, Genre, Beschreibung, Leserichtung. Vorhandene Angaben bleiben "
+    "unangetastet. Kein Schluessel noetig.":
+        "Kennt Manga-Serien, aber keine einzelnen Bände einer deutschen "
+        "Ausgabe. Bestimmt deshalb nie das Heft, sondern füllt nur Lücken: "
+        "Zeichner, Autor, Genre, Beschreibung, Leserichtung. Vorhandene "
+        "Angaben bleiben unangetastet. Kein Schlüssel nötig.",
     "Ueber ComicDesk": "Über ComicDesk",
     "Sprache": "Sprache",
     "Einstellungen …": "Einstellungen …",
@@ -490,6 +511,8 @@ EN = {
     "Wird nach der laufenden Datei beendet …":
         "Stopping after the current file …",
     "Fertig. {summary}": "Done. {summary}",
+    "Fertig – {count} getaggt": "Done – {count} tagged",
+    "Fertig – nichts geändert": "Done – nothing changed",
     "Fertig.": "Done.",
     "[{done}/{total}] {name}": "[{done}/{total}] {name}",
     "getaggt": "tagged",

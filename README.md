@@ -305,6 +305,7 @@ Quelle nicht füllt, und deine eigenen freien Tags bleiben erhalten.
 - `comicdesk/index.py` – Sammlungs-Index (SQLite + FTS5) und Suchsyntax
 - `comicdesk/indexdialog.py` – Sammlungsverwaltung und Scan-Fortschritt
 - `comicdesk/i18n.py` – Übersetzungstabellen
+- `comicdesk/theme.py` – Stylesheet, aus der Systempalette abgeleitet
 - `comicdesk/icons.py` – selbst gezeichnete SVG-Icons (Theme-unabhängig)
 
 Neue Sprache: in `i18n.py` ein Dict nach dem Muster von `EN` anlegen und in

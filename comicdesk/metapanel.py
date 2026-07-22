@@ -70,12 +70,13 @@ class MetaPanel(QWidget):
 
         self.header = QLabel(_("Keine Datei ausgewaehlt"))
         self.header.setWordWrap(True)
-        self.header.setStyleSheet("font-weight:600; padding:6px;")
+        self.header.setStyleSheet("font-weight:600; font-size:11pt; padding:8px 8px 2px 8px;")
         root.addWidget(self.header)
 
         self.source_label = QLabel()
         self.source_label.setWordWrap(True)
-        self.source_label.setStyleSheet("color:gray; padding:0 6px 6px 6px;")
+        self.source_label.setStyleSheet("padding:0 8px 8px 8px;")
+        self.source_label.setEnabled(False)
         root.addWidget(self.source_label)
 
         area = QScrollArea()

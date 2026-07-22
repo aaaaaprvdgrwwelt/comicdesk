@@ -41,6 +41,11 @@ PAD = 8
 SUBTITLE_ROLE = Qt.UserRole + 1
 #: (hat Tags, Quelle) aus dem Index - fuer die Ecke der Kachel.
 STATUS_ROLE = Qt.UserRole + 2
+#: Ordner werden anders gezeichnet als Cover.
+IS_DIR_ROLE = Qt.UserRole + 3
+FOLDER_ICON_SIZE = 72
+#: Enthaelt die Ansicht nur Ordner, braucht sie keine Cover-Hoehe.
+COMPACT_COVER_H = 96
 
 SOURCE_COLORS = {
     "comicvine": QColor(60, 130, 200),
@@ -58,10 +63,16 @@ SEARCH_FIELDS = ("serie: nummer: titel: jahr: verlag: genre: tag: figur: "
 class CoverDelegate(QStyledItemDelegate):
     """Zeichnet eine Kachel: Cover oben, Dateiname (max. 2 Zeilen) darunter."""
 
+    @staticmethod
+    def cover_height(index) -> int:
+        model = index.model()
+        return COMPACT_COVER_H if getattr(model, "compact", False) else COVER_H
+
     def sizeHint(self, option, index):  # noqa: N802
         fm = option.fontMetrics
         lines = TEXT_LINES + (1 if index.data(SUBTITLE_ROLE) else 0)
-        return QSize(TILE_W, COVER_H + lines * fm.height() + 3 * PAD)
+        return QSize(TILE_W, self.cover_height(index) + lines * fm.height()
+                     + 3 * PAD)
 
     def paint(self, painter: QPainter, option, index) -> None:  # noqa: N802
         painter.save()
@@ -79,20 +90,30 @@ class CoverDelegate(QStyledItemDelegate):
             painter.drawRoundedRect(rect, 6, 6)
 
         cover_rect = QRect(rect.left() + PAD, rect.top() + PAD,
-                           rect.width() - 2 * PAD, COVER_H)
-        icon = index.data(Qt.DecorationRole)
-        if isinstance(icon, QIcon):
-            avail = icon.availableSizes()
-            pm = icon.pixmap(avail[0] if avail else QSize(96, 96))
-            if not pm.isNull():
-                target = pm.size().scaled(cover_rect.size(), Qt.KeepAspectRatio)
-                x = cover_rect.left() + (cover_rect.width() - target.width()) // 2
-                y = cover_rect.top() + (cover_rect.height() - target.height())
-                dest = QRect(x, y, target.width(), target.height())
-                painter.setPen(QPen(QColor(0, 0, 0, 90)))
-                painter.setBrush(Qt.NoBrush)
-                painter.drawPixmap(dest, pm)
-                painter.drawRect(dest.adjusted(0, 0, -1, -1))
+                           rect.width() - 2 * PAD, self.cover_height(index))
+        if index.data(IS_DIR_ROLE):
+            # Ordner sind keine Cover - ein kleines Symbol mittig statt eines
+            # auf Kachelgroesse aufgeblasenen Icons.
+            size = FOLDER_ICON_SIZE
+            pm = app_icon("folder", size).pixmap(size, size)
+            painter.drawPixmap(
+                cover_rect.left() + (cover_rect.width() - size) // 2,
+                cover_rect.top() + (cover_rect.height() - size) // 2,
+                pm)
+        else:
+            icon = index.data(Qt.DecorationRole)
+            if isinstance(icon, QIcon):
+                avail = icon.availableSizes()
+                pm = icon.pixmap(avail[0] if avail else QSize(96, 96))
+                if not pm.isNull():
+                    target = pm.size().scaled(cover_rect.size(), Qt.KeepAspectRatio)
+                    x = cover_rect.left() + (cover_rect.width() - target.width()) // 2
+                    y = cover_rect.top() + (cover_rect.height() - target.height())
+                    dest = QRect(x, y, target.width(), target.height())
+                    painter.setPen(QPen(QColor(0, 0, 0, 60)))
+                    painter.setBrush(Qt.NoBrush)
+                    painter.drawPixmap(dest, pm)
+                    painter.drawRect(dest.adjusted(0, 0, -1, -1))
 
         fm = option.fontMetrics
         text_rect = QRect(rect.left() + 4, cover_rect.bottom() + PAD,
@@ -169,6 +190,8 @@ class ComicListModel(QAbstractListModel):
         self.show_parent = False
         #: Pfad -> (hat Tags, Quelle); leer heisst "nicht im Index".
         self.status: dict[str, tuple[bool, str | None]] = {}
+        #: Reine Ordneransicht - dann reichen niedrigere Kacheln.
+        self.compact = False
         loader.ready.connect(self._on_thumb)
 
     def set_entries(self, entries: list[Path], show_parent: bool = False,
@@ -177,6 +200,7 @@ class ComicListModel(QAbstractListModel):
         self.entries = entries
         self.show_parent = show_parent
         self.status = status or {}
+        self.compact = bool(entries) and all(p.is_dir() for p in entries)
         self.endResetModel()
 
     def rowCount(self, parent=QModelIndex()) -> int:  # noqa: N802
@@ -197,6 +221,8 @@ class ComicListModel(QAbstractListModel):
             return str(p)
         if role == SUBTITLE_ROLE:
             return p.parent.name if self.show_parent else None
+        if role == IS_DIR_ROLE:
+            return p.is_dir()
         if role == STATUS_ROLE:
             return None if p.is_dir() else self.status.get(str(p))
         if role == Qt.DecorationRole:
@@ -286,7 +312,7 @@ class MainWindow(QMainWindow):
         fav_layout.setContentsMargins(0, 0, 0, 0)
         fav_layout.setSpacing(2)
         fav_header = QLabel(_("Favoriten"))
-        fav_header.setStyleSheet("font-weight:600; padding:4px 6px;")
+        fav_header.setStyleSheet("font-weight:600; padding:6px 4px 2px 4px;")
         fav_layout.addWidget(fav_header)
         fav_layout.addWidget(self.fav_list, 1)
 

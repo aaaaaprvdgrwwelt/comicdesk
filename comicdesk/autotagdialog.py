@@ -338,7 +338,14 @@ class AutoTagDialog(QDialog):
         root.addWidget(self.status)
         self.bar = QProgressBar()
         self.bar.setRange(0, len(paths))
+        self.bar.setFormat("%v / %m")
         root.addWidget(self.bar)
+
+        self.banner = QLabel()
+        self.banner.setWordWrap(True)
+        self.banner.setVisible(False)
+        self.banner.setObjectName("resultBanner")
+        root.addWidget(self.banner)
 
         self.table = QTableWidget(0, len(self.COLUMNS))
         self.table.setHorizontalHeaderLabels([_(c) for c in self.COLUMNS])
@@ -390,15 +397,26 @@ class AutoTagDialog(QDialog):
         self.source_labels = {p.name: _(p.label) for p in config.providers}
         self.table.setRowCount(0)
         self.counts.clear()
-        self.btn_start.setEnabled(False)
-        self.btn_stop.setEnabled(True)
-        self.btn_settings.setEnabled(False)
+        self.banner.setVisible(False)
+        self._set_running(True)
 
         self.thread, self.worker = run_in_thread(self.paths, config)
         self.worker.progress.connect(self._on_progress)
         self.worker.result.connect(self._on_result)
         self.worker.finished.connect(self._on_finished)
         self.thread.start()
+
+    def _set_running(self, running: bool) -> None:
+        """Waehrend des Laufs gibt es nur einen Ausweg: Abbrechen."""
+        self.btn_start.setEnabled(not running)
+        self.btn_settings.setEnabled(not running)
+        self.btn_stop.setEnabled(running)
+        self.btn_close.setVisible(not running)
+        self.bar.setVisible(True)
+
+    @property
+    def running(self) -> bool:
+        return self.thread is not None and self.thread.isRunning()
 
     def stop(self) -> None:
         if self.worker:
@@ -427,21 +445,38 @@ class AutoTagDialog(QDialog):
         self.bar.setValue(self.bar.value() + 1)
 
     def _on_finished(self) -> None:
-        self.btn_start.setEnabled(True)
-        self.btn_stop.setEnabled(False)
-        self.btn_settings.setEnabled(True)
-        self.bar.setValue(len(self.paths))
-        summary = ", ".join(f"{v}× {_(k)}" for k, v in sorted(self.counts.items()))
-        self.status.setText(
-            _("Fertig. {summary}").format(summary=summary) if summary
-            else _("Fertig."))
         if self.thread:
             self.thread.quit()
             self.thread.wait(3000)
+        self.thread = self.worker = None
+        self._set_running(False)
+        self.bar.setValue(len(self.paths))
+        self.bar.setVisible(False)
+
+        tagged = self.counts.get("getaggt", 0)
+        problems = sum(v for k, v in self.counts.items()
+                       if k in ("Fehler", "unsicher", "kein Treffer"))
+        parts = [f"{v} {_(k)}" for k, v in sorted(self.counts.items())]
+        headline = (_("Fertig – {count} getaggt").format(count=tagged) if tagged
+                    else _("Fertig – nichts geändert"))
+        self.status.setText("")
+        self.banner.setText(f"{headline}\n{' · '.join(parts)}")
+        self.banner.setProperty(
+            "state", "ok" if tagged and not problems
+            else "warn" if tagged or problems else "neutral")
+        self.banner.style().unpolish(self.banner)
+        self.banner.style().polish(self.banner)
+        self.banner.setVisible(True)
+        self.btn_close.setDefault(True)
+        self.btn_close.setFocus()
+
+    def reject(self) -> None:
+        if self.running:
+            return  # waehrend des Laufs nur ueber "Abbrechen"
+        super().reject()
 
     def closeEvent(self, event):  # noqa: N802
-        self.stop()
-        if self.thread:
-            self.thread.quit()
-            self.thread.wait(5000)
+        if self.running:
+            event.ignore()
+            return
         super().closeEvent(event)

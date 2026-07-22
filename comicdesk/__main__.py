@@ -9,6 +9,7 @@ from PySide6.QtWidgets import QApplication
 
 from .i18n import set_language
 from .mainwindow import MainWindow
+from . import theme
 
 
 #: Scanner schreiben gern fehlerhafte PNG-Schluesselwoerter ("EPSON  sRGB" -
@@ -29,6 +30,7 @@ def main() -> int:
     app.setApplicationName("ComicDesk")
     app.setOrganizationName("comicdesk")
     set_language(QSettings("comicdesk", "comicdesk").value("language", "auto"))
+    theme.apply(app)
     win = MainWindow()
     if len(sys.argv) > 1:
         target = Path(sys.argv[1]).expanduser()
