@@ -9,11 +9,12 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QSize, Qt, QThread, Signal
-from PySide6.QtGui import QColor, QPixmap
+from PySide6.QtCore import QUrl
+from PySide6.QtGui import QColor, QDesktopServices, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView, QDialog, QFormLayout, QHBoxLayout, QHeaderView, QLabel,
     QLineEdit, QMessageBox, QPushButton, QTableWidget, QTableWidgetItem,
-    QTextEdit, QVBoxLayout, QWidget,
+    QTextBrowser, QVBoxLayout, QWidget,
 )
 
 from . import archive
@@ -138,10 +139,13 @@ class MatchDialog(QDialog):
         header.setSectionResizeMode(3, QHeaderView.Stretch)
         self.table.itemSelectionChanged.connect(self._show_details)
         self.table.doubleClicked.connect(lambda _i: self.apply())
+        self.table.setToolTip(_(
+            "Doppelklick übernimmt den Treffer. „Im Browser ansehen“ zeigt "
+            "die Seite der Quelle."))
         root.addWidget(self.table, 1)
 
-        self.details = QTextEdit()
-        self.details.setReadOnly(True)
+        self.details = QTextBrowser()
+        self.details.setOpenExternalLinks(True)
         self.details.setMaximumHeight(64)
         root.addWidget(self.details)
 
@@ -151,6 +155,12 @@ class MatchDialog(QDialog):
         knoepfe = QHBoxLayout()
         self.btn_search = QPushButton(_("Erneut suchen"))
         self.btn_search.clicked.connect(self.search)
+        self.btn_open = QPushButton(_("Im Browser ansehen"))
+        self.btn_open.setToolTip(_(
+            "Öffnet die Seite der Quelle zu diesem Treffer - zum Nachsehen, "
+            "ob es wirklich dasselbe Heft ist."))
+        self.btn_open.setEnabled(False)
+        self.btn_open.clicked.connect(self.open_in_browser)
         self.btn_apply = QPushButton(_("Übernehmen"))
         self.btn_apply.setDefault(True)
         self.btn_apply.setEnabled(False)
@@ -158,6 +168,7 @@ class MatchDialog(QDialog):
         self.btn_close = QPushButton(_("Schliessen"))
         self.btn_close.clicked.connect(self.reject)
         knoepfe.addWidget(self.btn_search)
+        knoepfe.addWidget(self.btn_open)
         knoepfe.addStretch(1)
         knoepfe.addWidget(self.btn_apply)
         knoepfe.addWidget(self.btn_close)
@@ -291,22 +302,36 @@ class MatchDialog(QDialog):
         index = rows[0].row()
         return self.candidates[index] if index < len(self.candidates) else None
 
+    def link_of(self, candidate) -> str:
+        return (candidate.metadata.web_link or "") if candidate else ""
+
     def _show_details(self) -> None:
         candidate = self._selected()
         self.btn_apply.setEnabled(candidate is not None)
+        self.btn_open.setEnabled(bool(self.link_of(candidate)))
         if candidate is None:
             self.details.clear()
             return
+        import html
+
         md = candidate.metadata
-        zeilen = [f"{candidate.series_name} #{candidate.issue_number}"
-                  + (f" ({candidate.year})" if candidate.year else "")]
+        kopf = (f"{candidate.series_name} #{candidate.issue_number}"
+                + (f" ({candidate.year})" if candidate.year else ""))
+        teile = [f"<b>{html.escape(kopf)}</b>"]
         if md.title:
-            zeilen.append(md.title)
+            teile.append(html.escape(md.title))
         if candidate.reasons:
-            zeilen.append(" · ".join(candidate.reasons))
-        if md.web_link:
-            zeilen.append(md.web_link)
-        self.details.setPlainText("\n".join(zeilen))
+            teile.append(html.escape(" · ".join(candidate.reasons)))
+        link = self.link_of(candidate)
+        if link:
+            teile.append(f'<a href="{html.escape(link)}">{html.escape(link)}</a>')
+        self.details.setHtml(" &middot; ".join(teile[:1]) + "<br>"
+                             + "<br>".join(teile[1:]))
+
+    def open_in_browser(self) -> None:
+        link = self.link_of(self._selected())
+        if link:
+            QDesktopServices.openUrl(QUrl(link))
 
     def apply(self) -> None:
         candidate = self._selected()

@@ -178,7 +178,7 @@ class ComicVineProvider(MetadataProvider):
         data = self._get("issues", {
             "filter": flt,
             "limit": 50,
-            "field_list": "id,name,issue_number,cover_date,store_date,image,volume",
+            "field_list": "id,name,issue_number,cover_date,store_date,image,\n                           volume,site_detail_url",
         })
         return data.get("results", [])
 
@@ -198,7 +198,10 @@ class ComicVineProvider(MetadataProvider):
             month = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else None
             day = int(parts[2]) if len(parts) > 2 and parts[2].isdigit() else None
         md.year, md.month, md.day = year, month, day
-        md.web_link = issue.get("site_detail_url")
+        # Ohne site_detail_url tut es die ID: die URL leitet auf die Seite um.
+        md.web_link = (issue.get("site_detail_url")
+                       or (f"https://comicvine.gamespot.com/issue/4000-"
+                           f"{issue.get('id')}/" if issue.get("id") else None))
         md.notes = f"ComicVine issue id {issue.get('id')}"
         md.is_empty = False
 

@@ -353,6 +353,15 @@ EN = {
         "The terms come from the tags or the file name. If the match is wrong, "
         "that is usually why - correct them and search again.",
     "Erneut suchen": "Search again",
+    "Im Browser ansehen": "Open in browser",
+    "Öffnet die Seite der Quelle zu diesem Treffer - zum Nachsehen, ob es "
+    "wirklich dasselbe Heft ist.":
+        "Opens the source's page for this match - to check whether it really "
+        "is the same issue.",
+    "Doppelklick übernimmt den Treffer. „Im Browser ansehen“ zeigt die Seite "
+    "der Quelle.":
+        "Double-click applies the match. “Open in browser” shows the source's "
+        "page.",
     "Wird gesucht …": "Searching …",
     "Wird übernommen …": "Applying …",
     "{count} Vorschläge": "{count} suggestions",

@@ -349,6 +349,11 @@ oder per Doppelklick auf eine Zeile im Auto-Tag-Protokoll siehst du **alle**
 Vorschläge samt Bewertung, Quelle und Cover neben dem Cover deines Hefts und
 wählst selbst.
 
+Zu jedem Treffer gibt es einen Link auf die Seite der Quelle — anklickbar in
+den Details oder über **„Im Browser ansehen"**. Damit lässt sich vor dem
+Übernehmen nachsehen, ob es wirklich dasselbe Heft ist; bei mehreren Ausgaben
+derselben Nummer ist das oft der einzige Weg.
+
 Serie, Nummer und Jahr sind dort änderbar. Das ist meist der eigentliche
 Hebel: Ein niedriger Score kommt fast immer daher, dass der Dateiname falsch
 gelesen wurde — Begriff korrigieren, erneut suchen, fertig.
