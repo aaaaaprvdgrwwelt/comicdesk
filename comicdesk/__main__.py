@@ -4,15 +4,27 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+from PySide6.QtCore import QSettings, QtMsgType, qInstallMessageHandler
 from PySide6.QtWidgets import QApplication
-
-from PySide6.QtCore import QSettings
 
 from .i18n import set_language
 from .mainwindow import MainWindow
 
 
+#: Scanner schreiben gern fehlerhafte PNG-Schluesselwoerter ("EPSON  sRGB" -
+#: Leerzeichen sind dort nicht erlaubt). Qt laedt das Bild trotzdem korrekt,
+#: meldet es aber pro Datei. Nur diese eine Sorte Meldung wird geschluckt.
+def _quiet_libpng(mode, context, message: str) -> None:
+    if "libpng warning" in message:
+        return
+    stream = sys.stderr if mode in (QtMsgType.QtWarningMsg,
+                                    QtMsgType.QtCriticalMsg,
+                                    QtMsgType.QtFatalMsg) else sys.stdout
+    print(message, file=stream)
+
+
 def main() -> int:
+    qInstallMessageHandler(_quiet_libpng)
     app = QApplication(sys.argv)
     app.setApplicationName("ComicDesk")
     app.setOrganizationName("comicdesk")

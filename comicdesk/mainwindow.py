@@ -257,7 +257,11 @@ class MainWindow(QMainWindow):
         for col in range(1, self.fs_model.columnCount()):
             self.tree.hideColumn(col)
         self.tree.setHeaderHidden(True)
-        self.tree.clicked.connect(self._tree_clicked)
+        self.tree.clicked.connect(self._tree_selected)
+        # currentChanged deckt auch Pfeiltasten und Pos1/Ende ab -
+        # clicked allein reagiert nur auf die Maus.
+        self.tree.selectionModel().currentChanged.connect(
+            lambda current, _previous: self._tree_selected(current))
 
         self.fav_list = QListWidget()
         self.fav_list.setDragDropMode(QAbstractItemView.InternalMove)
@@ -600,8 +604,15 @@ class MainWindow(QMainWindow):
         self.meta.load(paths[0] if len(paths) == 1 else None)
         self._update_favorite_action()
 
-    def _tree_clicked(self, index: QModelIndex) -> None:
-        self.set_directory(Path(self.fs_model.filePath(index)))
+    def _tree_selected(self, index: QModelIndex) -> None:
+        if not index.isValid():
+            return
+        path = Path(self.fs_model.filePath(index))
+        # set_directory setzt selbst den Baumeintrag - ohne diese Bremse
+        # riefe das Signal sich endlos gegenseitig auf.
+        if path == self.current_dir:
+            return
+        self.set_directory(path)
 
     def _activate(self, index: QModelIndex) -> None:
         p = self.model.path_at(index)

@@ -67,7 +67,8 @@ nach. Gespeichert wird in `~/.local/share/comicdesk/favorites.json`.
 werden beim Beenden gemerkt. Ein Pfad als Startargument (`./comicdesk.sh ~/X`)
 hat Vorrang und überschreibt das gemerkte Verzeichnis für diesen Start.
 
-**Browsen** — Ordnerbaum links, Cover-Kacheln in der Mitte. Thumbnails werden
+**Browsen** — Ordnerbaum links, mit Maus **und** Tastatur bedienbar (Pfeiltasten
+wechseln das Verzeichnis sofort mit), Cover-Kacheln in der Mitte. Thumbnails werden
 im Hintergrund erzeugt und in `~/.cache/comicdesk/thumbs` zwischengespeichert.
 Filterfeld oben rechts filtert nach Dateiname.
 
