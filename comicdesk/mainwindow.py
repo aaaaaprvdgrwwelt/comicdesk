@@ -539,7 +539,7 @@ class MainWindow(QMainWindow):
             "clear_tags": act("Tags löschen", None, self.clear_tags,
                               on_view=True),
             "move_collection": act("In Sammlung verschieben …", None,
-                                   self.move_to_collection, "folder",
+                                   self.move_selection_to_collection, "folder",
                                    on_view=True),
             "rename_tpl": act("Nach Tags benennen", "Ctrl+R",
                               self.rename_by_template, on_view=True),
@@ -555,7 +555,7 @@ class MainWindow(QMainWindow):
             "convert": act("Nach CBZ konvertieren", None, self.convert_selected,
                            on_view=True),
             "index": act("Sammlungen …", "Ctrl+Shift+M", self.edit_index, "index"),
-            "settings": act("Einstellungen …", "Ctrl+,", self.edit_settings,
+            "settings": act("Einstellungen …", "Ctrl+,", self.open_settings,
                             "settings"),
             "about": act("Ueber ComicDesk", None, self.show_about),
         }
@@ -1120,15 +1120,18 @@ class MainWindow(QMainWindow):
         self.refresh()
         self.statusBar().showMessage(_("Seiten gespeichert."), 4000)
 
-    def move_to_collection(self, folder: Path | None = None) -> None:
+    def move_selection_to_collection(self) -> None:
+        """Slot fuer die Aktion - ohne Parameter, weil QAction.triggered einen
+        bool mitschickt und der sonst als Ordner ankaeme."""
+        ordner = [p for p in self.selected_paths() if p.is_dir()]
+        if len(ordner) != 1:
+            self.statusBar().showMessage(
+                _("Bitte genau einen Ordner waehlen."), 4000)
+            return
+        self.move_to_collection(ordner[0])
+
+    def move_to_collection(self, folder: Path) -> None:
         """Ordner in eine andere Sammlung verschieben - Datei und Index."""
-        if folder is None:
-            ordner = [p for p in self.selected_paths() if p.is_dir()]
-            if len(ordner) != 1:
-                self.statusBar().showMessage(
-                    _("Bitte genau einen Ordner waehlen."), 4000)
-                return
-            folder = ordner[0]
         quelle = self.index.collection_for(folder)
         ziele = [c for c in self.index.collections()
                  if c.name != quelle and any(Path(r).is_dir() for r in c.roots)]
@@ -1223,6 +1226,10 @@ class MainWindow(QMainWindow):
         self.refresh()
         self.meta.load(target)
         self.statusBar().showMessage(_("Tags gespeichert."), 4000)
+
+    def open_settings(self) -> None:
+        """Slot ohne Parameter - siehe move_selection_to_collection."""
+        self.edit_settings()
 
     def edit_settings(self, start_tab: int = 0) -> None:
         dialog = SettingsDialog(self.settings, self, start_tab)
