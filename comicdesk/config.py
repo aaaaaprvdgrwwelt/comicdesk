@@ -10,6 +10,7 @@ from .providers.base import MetadataProvider
 from .providers.anilist import AniListProvider
 from .providers.comicvine import ComicVineProvider
 from .providers.gcd import GcdProvider
+from .translate import DEFAULT_MODEL, Translator
 
 
 def _bool(value, default: bool) -> bool:
@@ -73,3 +74,33 @@ class TaggerSettings:
             overwrite_existing=self.overwrite_existing,
             providers=self.build_providers(),
         )
+
+
+@dataclass
+class TranslationSettings:
+    """Lesehilfe im Reader - getrennt von den Tag-Quellen."""
+
+    api_key: str = ""
+    model: str = DEFAULT_MODEL
+    language: str = "Deutsch"
+
+    @classmethod
+    def load(cls, settings: QSettings) -> TranslationSettings:
+        settings.beginGroup("translate")
+        obj = cls(
+            api_key=settings.value("api_key", "") or "",
+            model=settings.value("model", DEFAULT_MODEL) or DEFAULT_MODEL,
+            language=settings.value("language", "Deutsch") or "Deutsch",
+        )
+        settings.endGroup()
+        return obj
+
+    def save(self, settings: QSettings) -> None:
+        settings.beginGroup("translate")
+        for key, value in self.__dict__.items():
+            settings.setValue(key, value)
+        settings.endGroup()
+        settings.sync()
+
+    def build(self) -> Translator:
+        return Translator(self.api_key, self.model, self.language)

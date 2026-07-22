@@ -99,6 +99,21 @@ sonstige Dateien im Archiv bleiben erhalten, `PageCount` wird angepasst.
 Das geht bei **CBZ** und **PDF**. CBR/CB7/CBT sind schreibgeschützt — erst
 „Nach CBZ konvertieren".
 
+**Übersetzen beim Lesen** (Taste `T` im Reader) — schickt die aktuelle Seite an
+ein Bildmodell über [OpenRouter](https://openrouter.ai) und zeigt die
+Sprechblasen daneben, im Original und übersetzt, in Lesereihenfolge. **Die
+Comicdatei wird nicht verändert** — der Text im Bild bleibt, wie er ist. Wer
+den Text tatsächlich im Bild ersetzen will, braucht Retusche und Satz; dafür
+sind [comic-translate](https://github.com/ogkalu2/comic-translate) oder
+[manga-image-translator](https://github.com/zyddnys/manga-image-translator) die
+richtigen Werkzeuge.
+
+Schlüssel und Modell unter *Extras → Einstellungen → Übersetzung*. Seiten
+werden vor dem Senden auf 1400 px verkleinert (spart Token, ohne der Erkennung
+zu schaden) und die Antworten nach Bildinhalt dauerhaft zwischengespeichert —
+erneutes Lesen kostet nichts. Eine Seite liegt je nach Modell bei Bruchteilen
+eines Cents.
+
 **Taggen** — rechte Seitenleiste, schreibt `ComicInfo.xml` ins Archiv
 (Standardformat, das auch Komet, Kavita, Komga, ComicRack und ComicTagger lesen).
 Freie Tags landen im `<Tags>`-Element. `Strg+S` speichert.
@@ -348,7 +363,8 @@ Quelle nicht füllt, und deine eigenen freien Tags bleiben erhalten.
 - `comicdesk/thumbs.py` – Cover-Thumbnails im Threadpool, Platten-Cache
 - `comicdesk/mainwindow.py` – Browser, Kachel-Delegate, Dateioperationen
 - `comicdesk/dirtree.py` – Ordnerbaum mit den Sammlungen als Wurzeln
-- `comicdesk/reader.py` – Lesefenster
+- `comicdesk/reader.py` – Lesefenster samt Übersetzungs-Seitenleiste
+- `comicdesk/translate.py` – OpenRouter-Anbindung für die Lesehilfe
 - `comicdesk/metapanel.py` – Tag-Editor
 - `comicdesk/pageeditor.py` – Seiten löschen und umsortieren
 - `comicdesk/favorites.py` – Favoritenliste (JSON)

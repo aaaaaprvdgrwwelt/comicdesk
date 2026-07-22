@@ -446,6 +446,7 @@ EN = {
     "Quelle: {source} (Heft-ID {id})": "Source: {source} (issue ID {id})",
 
     "Ordner mit Cover anzeigen": "Show folders with cover",
+    "Ganzes Dateisystem": "Whole file system",
     "Oeffnen": "Open",
     "Hier automatisch taggen": "Auto-tag this folder",
     "Neuer Ordner …": "New folder …",
@@ -463,6 +464,41 @@ EN = {
         "“{name}” removed from favourites.",
     "{count} verschwundene Favoriten entfernt.":
         "{count} missing favourites removed.",
+
+    # --- Uebersetzung
+    "Übersetzung": "Translation",
+    "OpenRouter-Schlüssel": "OpenRouter key",
+    "Schlüssel von openrouter.ai/keys": "Key from openrouter.ai/keys",
+    "Modell": "Model",
+    "Übersetzen nach": "Translate into",
+    "Der Reader kann eine Seite an ein Bildmodell schicken und die "
+    "Sprechblasen im Original und übersetzt daneben anzeigen. Die Comicdatei "
+    "wird dabei nicht verändert. Eine Seite kostet je nach Modell Bruchteile "
+    "eines Cents; Antworten werden dauerhaft zwischengespeichert.":
+        "The reader can send a page to a vision model and show the speech "
+        "bubbles beside it, original and translated. The comic file is not "
+        "modified. A page costs a fraction of a cent depending on the model; "
+        "answers are cached permanently.",
+    "Kein OpenRouter-Schlüssel hinterlegt.": "No OpenRouter key configured.",
+    "Einzutragen unter Extras › Einstellungen › Übersetzung.":
+        "Enter it under Tools › Settings › Translation.",
+    "Wird übersetzt …": "Translating …",
+    "Kein Text auf dieser Seite.": "No text on this page.",
+    "Seite {number}": "Page {number}",
+    "Sprechblase": "Speech",
+    "Gedanke": "Thought",
+    "Textkasten": "Caption",
+    "Geräusch": "Sound effect",
+    "Schild": "Sign",
+    "Antwort des Modells war kein gültiges JSON.":
+        "The model's answer was not valid JSON.",
+    "OpenRouter lehnt den Schlüssel ab.": "OpenRouter rejected the key.",
+    "OpenRouter drosselt gerade – später erneut versuchen.":
+        "OpenRouter is rate limiting - try again later.",
+    "OpenRouter antwortete mit {code}: {text}":
+        "OpenRouter answered with {code}: {text}",
+    "OpenRouter lieferte keine Antwort: {error}":
+        "OpenRouter returned no answer: {error}",
 
     # --- Reader
     "Reader": "Reader",
