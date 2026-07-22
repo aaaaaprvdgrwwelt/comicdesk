@@ -100,28 +100,29 @@ def score_candidate(query: SearchQuery, candidate: Candidate,
     return round(100 * sum(w * v for w, v in parts) / total_weight)
 
 
-def identify(path: Path, config: AutoTagConfig,
-             should_stop: Callable[[], bool] | None = None
-             ) -> tuple[Candidate | None, str, SearchQuery | None]:
-    """Besten Kandidaten fuer eine Datei suchen.
-
-    `should_stop` wird zwischen den Quellen und zwischen den Kandidaten
-    abgefragt - eine einzelne Datei kann ueber Netz mehrere Sekunden dauern,
-    und so lange darf ein Abbruch nicht wirkungslos bleiben.
-    """
-    stopped = should_stop or (lambda: False)
+def read_query(path: Path) -> tuple[SearchQuery | None, bytes | None]:
+    """Was ueber die Datei bekannt ist - Tags schlagen Dateinamen."""
     comic = archive.open_comic(path)
     try:
         existing = comic.read_metadata()
         cover = comic.page_bytes(0) if comic.page_count else None
     finally:
         comic.close()
-
     query = build_query(path, existing, cover)
-    if not query.series:
-        return None, _("Serienname weder in Tags noch im Dateinamen erkennbar."), None
+    return (query if query.series else None), cover
 
-    best: Candidate | None = None
+
+def collect_candidates(query: SearchQuery, config: AutoTagConfig,
+                       cover: bytes | None = None,
+                       should_stop: Callable[[], bool] | None = None
+                       ) -> tuple[list[Candidate], str]:
+    """Alle bewerteten Kandidaten, bester zuerst.
+
+    Getrennt von `identify`, damit die Auswahl von Hand dieselben Treffer
+    sieht wie die Automatik - sonst waere unklar, warum ein Vorschlag fehlt.
+    """
+    stopped = should_stop or (lambda: False)
+    gefunden: list[Candidate] = []
     notes: list[str] = []
     for provider in config.providers:
         if stopped():
@@ -147,9 +148,22 @@ def identify(path: Path, config: AutoTagConfig,
             if sim is not None:
                 candidate.reasons.append(
                     _("Cover-Aehnlichkeit {value}").format(value=f"{sim:.0%}"))
-            if best is None or candidate.score > best.score:
-                best = candidate
-    return best, "; ".join(notes), query
+            gefunden.append(candidate)
+    gefunden.sort(key=lambda c: -c.score)
+    return gefunden, "; ".join(notes)
+
+
+def identify(path: Path, config: AutoTagConfig,
+             should_stop: Callable[[], bool] | None = None
+             ) -> tuple[Candidate | None, str, SearchQuery | None]:
+    """Besten Kandidaten fuer eine Datei suchen."""
+    query, cover = read_query(path)
+    if query is None:
+        return None, _("Serienname weder in Tags noch im Dateinamen erkennbar."), None
+    gefunden, notes = collect_candidates(query, config, cover, should_stop)
+    return (gefunden[0] if gefunden else None), notes, query
+
+
 
 
 #: Felder, die eine Ergaenzungsquelle fuellen darf - aber nur wenn sie leer sind.

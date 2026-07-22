@@ -319,6 +319,17 @@ lieber nichts als das Falsche. Praktische Folge: deutsche Titel, die nichts mit
 dem Originaltitel zu tun haben („Pokémon Schwert und Schild" vs. „Pocket
 Monsters: Sword & Shield"), werden nicht erkannt.
 
+### Treffer von Hand wählen
+
+Was unterhalb des Schwellwerts landet, bleibt liegen — mit `Strg+Umschalt+T`
+oder per Doppelklick auf eine Zeile im Auto-Tag-Protokoll siehst du **alle**
+Vorschläge samt Bewertung, Quelle und Cover neben dem Cover deines Hefts und
+wählst selbst.
+
+Serie, Nummer und Jahr sind dort änderbar. Das ist meist der eigentliche
+Hebel: Ein niedriger Score kommt fast immer daher, dass der Dateiname falsch
+gelesen wurde — Begriff korrigieren, erneut suchen, fertig.
+
 ### Bewertung
 
 Aus Dateiname und vorhandenen Tags wird eine Anfrage gebaut (Tags schlagen

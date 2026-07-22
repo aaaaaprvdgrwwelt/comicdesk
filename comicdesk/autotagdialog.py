@@ -370,6 +370,9 @@ class AutoTagDialog(QDialog):
         header.setSectionResizeMode(5, QHeaderView.Stretch)
         self.source_labels: dict[str, str] = {}
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.table.doubleClicked.connect(self._open_match)
+        self.table.setToolTip(_("Doppelklick: Vorschläge ansehen und selbst wählen"))
         root.addWidget(self.table, 1)
 
         row = QHBoxLayout()
@@ -424,6 +427,31 @@ class AutoTagDialog(QDialog):
         self.worker.result.connect(self._on_result)
         self.worker.finished.connect(self._on_finished)
         self.thread.start()
+
+    def _open_match(self, index) -> None:
+        """Zeile doppelt geklickt: Vorschlaege fuer diese Datei zeigen."""
+        if self.running or not index.isValid():
+            return
+        item = self.table.item(index.row(), 0)
+        if item is None:
+            return
+        treffer = [p for p in self.paths if p.name == item.text()]
+        if not treffer:
+            return
+        from .matchdialog import MatchDialog
+
+        dialog = MatchDialog(treffer[0], self.settings, self)
+        dialog.applied.connect(lambda _p, row=index.row(): self._mark_tagged(row))
+        dialog.exec()
+
+    def _mark_tagged(self, row: int) -> None:
+        for spalte, wert in ((1, _("getaggt")), (5, _("von Hand gewählt"))):
+            item = self.table.item(row, spalte)
+            if item is not None:
+                item.setText(wert)
+        item = self.table.item(row, 1)
+        if item is not None:
+            item.setForeground(STATUS_COLORS["getaggt"])
 
     def _set_running(self, running: bool) -> None:
         """Waehrend des Laufs gibt es nur einen Ausweg: Abbrechen."""

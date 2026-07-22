@@ -313,6 +313,23 @@ EN = {
         "Done: {count} series searchable.",
     "Vorbereiten fehlgeschlagen:\n{error}": "Preparation failed:\n{error}",
 
+    # --- Treffer waehlen
+    "Treffer wählen …": "Choose match …",
+    "Treffer wählen – {name}": "Choose match – {name}",
+    "Die Begriffe stammen aus den Tags oder dem Dateinamen. Passt der Treffer "
+    "nicht, liegt es meist daran – korrigieren und erneut suchen.":
+        "The terms come from the tags or the file name. If the match is wrong, "
+        "that is usually why - correct them and search again.",
+    "Erneut suchen": "Search again",
+    "Wird gesucht …": "Searching …",
+    "Wird übernommen …": "Applying …",
+    "{count} Vorschläge": "{count} suggestions",
+    "Bitte einen Seriennamen eingeben.": "Please enter a series name.",
+    "Doppelklick: Vorschläge ansehen und selbst wählen":
+        "Double-click: view suggestions and choose yourself",
+    "von Hand gewählt": "chosen by hand",
+    "Nr.": "No.",
+
     # --- Sammlungen
     "Sammlungen": "Collections",
     "Sammlungen verwalten …": "Manage collections …",

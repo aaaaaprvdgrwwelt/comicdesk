@@ -24,6 +24,7 @@ from .autotagdialog import AutoTagDialog, SettingsDialog
 from .dirtree import DirTreeModel
 from .index import CollectionIndex
 from .indexdialog import CollectionsDialog
+from .matchdialog import MatchDialog
 from .metapanel import MetaPanel
 from .pageeditor import PageEditorDialog
 from .reader import ReaderWindow
@@ -526,6 +527,8 @@ class MainWindow(QMainWindow):
             "series": act("Reihen …", "Ctrl+E", self.show_series, "index"),
             "autotag": act("Automatisch taggen", "Ctrl+T", self.auto_tag,
                            "tag", on_view=True),
+            "choose_match": act("Treffer wählen …", "Ctrl+Shift+T",
+                                self.choose_match, on_view=True),
             "rename_tpl": act("Nach Tags benennen", "Ctrl+R",
                               self.rename_by_template, on_view=True),
             "pages": act("Seiten verwalten …", "Ctrl+P", self.edit_pages,
@@ -586,7 +589,7 @@ class MainWindow(QMainWindow):
         menu = bar.addMenu(_("E&xtras"))
         menu.addAction(a["index"])
         menu.addSeparator()
-        for key in ("autotag", "rename_tpl", "pages", "convert"):
+        for key in ("autotag", "choose_match", "rename_tpl", "pages", "convert"):
             menu.addAction(a[key])
         menu.addSeparator()
         menu.addAction(a["settings"])
@@ -1098,6 +1101,24 @@ class MainWindow(QMainWindow):
         self._reindex(target)
         self.refresh()
         self.statusBar().showMessage(_("Seiten gespeichert."), 4000)
+
+    def choose_match(self) -> None:
+        """Vorschlaege ansehen und selbst waehlen - fuer unsichere Faelle."""
+        paths = [p for p in self.selected_paths() if p.is_file()]
+        if len(paths) != 1:
+            self.statusBar().showMessage(_("Bitte genau einen Eintrag waehlen."), 4000)
+            return
+        dialog = MatchDialog(paths[0], self.settings, self)
+        dialog.applied.connect(self._on_match_applied)
+        dialog.exec()
+
+    def _on_match_applied(self, path: str) -> None:
+        target = Path(path)
+        self.loader.forget(target)
+        self._reindex(target)
+        self.refresh()
+        self.meta.load(target)
+        self.statusBar().showMessage(_("Tags gespeichert."), 4000)
 
     def edit_settings(self, start_tab: int = 0) -> None:
         dialog = SettingsDialog(self.settings, self, start_tab)
