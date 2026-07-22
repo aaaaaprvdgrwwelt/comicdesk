@@ -66,6 +66,13 @@ class Candidate:
     reasons: list[str] = field(default_factory=list)
 
 
+#: Quellen, die ein einzelnes Heft bestimmen koennen.
+ROLE_PRIMARY = "primary"
+#: Quellen, die nur die Serie kennen (Zeichner, Genre, Beschreibung). Sie
+#: gewinnen nie allein, sondern fuellen nur, was sonst leer bliebe.
+ROLE_SUPPLEMENT = "supplement"
+
+
 class MetadataProvider:
     """Basisklasse. `search` liefert Kandidaten, Bewertung macht `autotag`."""
 
@@ -73,6 +80,7 @@ class MetadataProvider:
     label = "Basis"
     #: Ob diese Quelle Cover-URLs liefert und damit Bild-Verifikation erlaubt.
     has_covers = False
+    role = ROLE_PRIMARY
 
     def available(self) -> tuple[bool, str]:
         """(nutzbar, Begruendung falls nicht)."""
@@ -87,3 +95,7 @@ class MetadataProvider:
     def enrich(self, candidate: Candidate) -> Candidate:
         """Vollstaendige Metadaten nachladen - erst fuer den Gewinner noetig."""
         return candidate
+
+    def series_info(self, query: SearchQuery) -> GenericMetadata | None:
+        """Nur fuer Ergaenzungsquellen: was ueber die Serie bekannt ist."""
+        return None

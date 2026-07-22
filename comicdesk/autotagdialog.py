@@ -140,6 +140,21 @@ class SettingsDialog(QDialog):
         self._refresh_fts_status()
         root.addWidget(gcd_box)
 
+        manga_box = QGroupBox(_("AniList (Manga)"))
+        manga_form = QFormLayout(manga_box)
+        self.anilist_enabled = QCheckBox(_("AniList als Ergaenzung benutzen"))
+        self.anilist_enabled.setChecked(self.config.use_anilist)
+        manga_form.addRow(self.anilist_enabled)
+        manga_hint = QLabel(_(
+            "Kennt Manga-Serien, aber keine einzelnen Baende einer deutschen "
+            "Ausgabe. Bestimmt deshalb nie das Heft, sondern fuellt nur Luecken: "
+            "Zeichner, Autor, Genre, Beschreibung, Leserichtung. Vorhandene "
+            "Angaben bleiben unangetastet. Kein Schluessel noetig."))
+        manga_hint.setWordWrap(True)
+        manga_hint.setStyleSheet("color:gray;")
+        manga_form.addRow(manga_hint)
+        root.addWidget(manga_box)
+
         rule_box = QGroupBox(_("Automatik"))
         rule_form = QFormLayout(rule_box)
         slider_row = QHBoxLayout()
@@ -280,6 +295,7 @@ class SettingsDialog(QDialog):
         self.config.use_comicvine = self.cv_enabled.isChecked()
         self.config.comicvine_key = self.cv_key.text().strip()
         self.config.use_gcd = self.gcd_enabled.isChecked()
+        self.config.use_anilist = self.anilist_enabled.isChecked()
         self.config.gcd_path = self.gcd_path.text().strip()
         self.config.gcd_language = self.gcd_lang.currentData()
         self.config.threshold = self.threshold.value()

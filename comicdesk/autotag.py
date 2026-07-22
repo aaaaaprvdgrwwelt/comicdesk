@@ -11,7 +11,8 @@ from PySide6.QtCore import QObject, QThread, Signal
 from . import archive
 from .i18n import _
 from .providers.base import (
-    Candidate, MetadataProvider, SearchQuery, normalize_issue, series_similarity,
+    ROLE_SUPPLEMENT, Candidate, MetadataProvider, SearchQuery, normalize_issue,
+    series_similarity,
 )
 
 DEFAULT_THRESHOLD = 80
@@ -98,8 +99,9 @@ def score_candidate(query: SearchQuery, candidate: Candidate,
     return round(100 * sum(w * v for w, v in parts) / total_weight)
 
 
-def identify(path: Path, config: AutoTagConfig) -> tuple[Candidate | None, str]:
-    """Besten Kandidaten fuer eine Datei suchen. Gibt (Kandidat, Hinweis)."""
+def identify(path: Path, config: AutoTagConfig
+             ) -> tuple[Candidate | None, str, SearchQuery | None]:
+    """Besten Kandidaten fuer eine Datei suchen."""
     comic = archive.open_comic(path)
     try:
         existing = comic.read_metadata()
@@ -109,11 +111,13 @@ def identify(path: Path, config: AutoTagConfig) -> tuple[Candidate | None, str]:
 
     query = build_query(path, existing, cover)
     if not query.series:
-        return None, _("Serienname weder in Tags noch im Dateinamen erkennbar.")
+        return None, _("Serienname weder in Tags noch im Dateinamen erkennbar."), None
 
     best: Candidate | None = None
     notes: list[str] = []
     for provider in config.providers:
+        if provider.role == ROLE_SUPPLEMENT:
+            continue  # ergaenzt nur, bestimmt nie das Heft
         ok, why = provider.available()
         if not ok:
             notes.append(f"{_(provider.label)}: {why}")
@@ -133,13 +137,56 @@ def identify(path: Path, config: AutoTagConfig) -> tuple[Candidate | None, str]:
                     _("Cover-Aehnlichkeit {value}").format(value=f"{sim:.0%}"))
             if best is None or candidate.score > best.score:
                 best = candidate
-    return best, "; ".join(notes)
+    return best, "; ".join(notes), query
+
+
+#: Felder, die eine Ergaenzungsquelle fuellen darf - aber nur wenn sie leer sind.
+SUPPLEMENT_FIELDS = ("genre", "comments", "manga", "volume_count",
+                     "maturity_rating")
+
+
+def apply_supplements(md: GenericMetadata, query: SearchQuery,
+                      providers: list[MetadataProvider]) -> list[str]:
+    """Leerstellen von Ergaenzungsquellen fuellen. Nichts wird ueberschrieben."""
+    used: list[str] = []
+    for provider in providers:
+        if provider.role != ROLE_SUPPLEMENT or not provider.available()[0]:
+            continue
+        try:
+            extra = provider.series_info(query)
+        except Exception:  # noqa: BLE001
+            continue
+        if extra is None:
+            continue
+        filled = False
+        for field_name in SUPPLEMENT_FIELDS:
+            value = getattr(extra, field_name, None)
+            if value and not getattr(md, field_name, None):
+                setattr(md, field_name, value)
+                filled = True
+        # Mitwirkende nur ergaenzen, vorhandene Rollen bleiben unangetastet.
+        existing = {(c.get("person", ""), c.get("role", "")) for c in md.credits}
+        have_roles = {c.get("role", "") for c in md.credits}
+        for credit in extra.credits:
+            role, person = credit.get("role", ""), credit.get("person", "")
+            if role in have_roles or (person, role) in existing:
+                continue
+            md.add_credit(person, role)
+            filled = True
+        if filled:
+            used.append(provider.label)
+    return used
 
 
 def apply_candidate(path: Path, candidate: Candidate,
-                    provider: MetadataProvider) -> None:
-    """Kandidaten anreichern und in die Datei schreiben."""
+                    provider: MetadataProvider,
+                    supplements: list[MetadataProvider] | None = None,
+                    query: SearchQuery | None = None) -> list[str]:
+    """Kandidaten anreichern, ergaenzen und in die Datei schreiben."""
     provider.enrich(candidate)
+    used: list[str] = []
+    if supplements and query is not None:
+        used = apply_supplements(candidate.metadata, query, supplements)
     comic = archive.open_comic(path)
     try:
         merged = comic.read_metadata()
@@ -147,6 +194,7 @@ def apply_candidate(path: Path, candidate: Candidate,
         comic.write_metadata(merged)
     finally:
         comic.close()
+    return used
 
 
 # ---------------------------------------------------------------------------
@@ -192,7 +240,7 @@ class AutoTagWorker(QObject):
             return Result(path, "uebersprungen", detail=_("Hat bereits Tags."))
 
         try:
-            candidate, notes = identify(path, self.config)
+            candidate, notes, query = identify(path, self.config)
         except Exception as exc:  # noqa: BLE001
             return Result(path, "Fehler", detail=str(exc))
 
@@ -207,12 +255,17 @@ class AutoTagWorker(QObject):
                 _("unter Schwellwert {threshold}. {notes}").format(
                     threshold=self.config.threshold, notes=notes))
         try:
-            apply_candidate(path, candidate, by_name[candidate.source])
+            used = apply_candidate(path, candidate, by_name[candidate.source],
+                                   self.config.providers, query)
         except Exception as exc:  # noqa: BLE001
             return Result(path, "Fehler", candidate.score, candidate.source,
                           summary, str(exc))
+        reasons = list(candidate.reasons)
+        if used:
+            reasons.append(_("ergaenzt durch {sources}").format(
+                sources=", ".join(used)))
         return Result(path, "getaggt", candidate.score, candidate.source,
-                      summary, "; ".join(candidate.reasons))
+                      summary, "; ".join(reasons))
 
 
 def run_in_thread(paths: list[Path], config: AutoTagConfig):

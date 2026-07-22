@@ -149,6 +149,8 @@ DE = {
     "Die Comic-Dateien selbst bleiben unangetastet.":
         "Sammlung „{name}“ mit {count} indizierten Comics löschen?\n\n"
         "Die Comic-Dateien selbst bleiben unangetastet.",
+    "AniList als Ergaenzung benutzen": "AniList als Ergänzung benutzen",
+    "ergaenzt durch {sources}": "ergänzt durch {sources}",
     "Von Hand": "Von Hand",
     "Quelle unbekannt": "Quelle unbekannt",
     "Nicht getaggt": "Nicht getaggt",
@@ -246,6 +248,22 @@ EN = {
     "Seiten koennen in {suffix} nicht bearbeitet werden. Datei zuerst nach "
     "CBZ konvertieren.":
         "Pages cannot be edited in {suffix}. Convert the file to CBZ first.",
+
+    # --- AniList
+    "AniList (Manga)": "AniList (manga)",
+    "AniList als Ergaenzung benutzen": "Use AniList as a supplement",
+    "AniList ist abgeschaltet.": "AniList is switched off.",
+    "AniList-Limit erreicht, bitte spaeter erneut.":
+        "AniList rate limit reached, please try again later.",
+    "Kennt Manga-Serien, aber keine einzelnen Baende einer deutschen Ausgabe. "
+    "Bestimmt deshalb nie das Heft, sondern fuellt nur Luecken: Zeichner, "
+    "Autor, Genre, Beschreibung, Leserichtung. Vorhandene Angaben bleiben "
+    "unangetastet. Kein Schluessel noetig.":
+        "Knows manga series, but not the individual volumes of a local "
+        "edition. It therefore never decides which issue a file is; it only "
+        "fills gaps: artist, author, genre, description, reading direction. "
+        "Existing values are left untouched. No key required.",
+    "ergaenzt durch {sources}": "supplemented by {sources}",
 
     # --- GCD-Volltextindex
     "Suche vorbereiten": "Prepare search",

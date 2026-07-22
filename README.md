@@ -246,6 +246,24 @@ Carlsen, Splitter, Bastei), die ComicVine kaum erfasst. Über „Nur Sprache“
 lassen sich z. B. ausschließlich deutsche Ausgaben berücksichtigen. Der Dump
 enthält keine Cover-URLs, hier gibt es also keinen Bildabgleich.
 
+### AniList (Manga)
+
+Kein Schlüssel nötig, Limit 90 Anfragen/Minute, gedrosselt und gecacht.
+
+AniList kennt Manga-**Serien**, aber keine einzelnen Bände einer deutschen
+Ausgabe — Verlag, Jahr und Bandtitel stehen in der GCD. Deshalb läuft AniList
+als **Ergänzungsquelle**: sie bestimmt nie, welches Heft eine Datei ist, und
+gewinnt nie eine Bewertung. Sie füllt nur Felder, die sonst leer blieben —
+Zeichner, Autor, Genre, Beschreibung, Leserichtung, Bandzahl. Vorhandene
+Angaben werden nie überschrieben, und eine Rolle, die schon besetzt ist,
+bleibt unangetastet.
+
+Der Serienname muss zu mindestens 75 % passen, sonst wird nichts ergänzt.
+Bei einer Ergänzung ist eine Fehlzuordnung teuer und schwer zu bemerken, daher
+lieber nichts als das Falsche. Praktische Folge: deutsche Titel, die nichts mit
+dem Originaltitel zu tun haben („Pokémon Schwert und Schild" vs. „Pocket
+Monsters: Sword & Shield"), werden nicht erkannt.
+
 ### Bewertung
 
 Aus Dateiname und vorhandenen Tags wird eine Anfrage gebaut (Tags schlagen
@@ -280,7 +298,8 @@ Quelle nicht füllt, und deine eigenen freien Tags bleiben erhalten.
 - `comicdesk/favorites.py` – Favoritenliste (JSON)
 - `comicdesk/provenance.py` – erkennt, woher die Tags einer Datei stammen
 - `comicdesk/providers/` – Metadaten-Quellen hinter einer gemeinsamen
-  Schnittstelle (`base.py`), aktuell `comicvine.py` und `gcd.py`
+  Schnittstelle (`base.py`), aktuell `comicvine.py`, `gcd.py` und
+  `anilist.py`; `cache.py` hält Netzantworten vor
 - `comicdesk/autotag.py` – Bewertung und Batch-Lauf im Hintergrund-Thread
 - `comicdesk/autotagdialog.py` – Quellen-Einstellungen und Lauf-Protokoll
 - `comicdesk/index.py` – Sammlungs-Index (SQLite + FTS5) und Suchsyntax
