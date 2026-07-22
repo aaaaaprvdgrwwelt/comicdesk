@@ -12,11 +12,26 @@ from .mainwindow import MainWindow
 from . import theme
 
 
-#: Scanner schreiben gern fehlerhafte PNG-Schluesselwoerter ("EPSON  sRGB" -
-#: Leerzeichen sind dort nicht erlaubt). Qt laedt das Bild trotzdem korrekt,
-#: meldet es aber pro Datei. Nur diese eine Sorte Meldung wird geschluckt.
+#: Bekannte, folgenlose Meldungen. Nur genau diese werden geschluckt - alles
+#: andere bleibt sichtbar.
+#:
+#: * libpng: Scanner schreiben gern unzulaessige PNG-Schluesselwoerter
+#:   ("EPSON  sRGB"). Qt laedt das Bild trotzdem korrekt, meldet es aber pro
+#:   Datei.
+#: * "This plugin ...": unter Wayland verbietet das Protokoll, was X11 erlaubte
+#:   (Maus greifen, Fenster nach vorn holen). Qt meldet das bei jedem Versuch;
+#:   aendern laesst es sich in der Anwendung nicht.
+QUIET = (
+    "libpng warning",
+    "This plugin supports grabbing the mouse only for popup windows",
+    "This plugin does not support grabbing the keyboard",
+    "This plugin does not support propagateSizeHints()",
+    "This plugin does not support raise()",
+)
+
+
 def _quiet_libpng(mode, context, message: str) -> None:
-    if "libpng warning" in message:
+    if any(noise in message for noise in QUIET):
         return
     stream = sys.stderr if mode in (QtMsgType.QtWarningMsg,
                                     QtMsgType.QtCriticalMsg,

@@ -854,8 +854,13 @@ class MainWindow(QMainWindow):
     def open_comic(self, path: Path) -> None:
         key = str(path)
         if key in self.readers:
-            self.readers[key].raise_()
-            self.readers[key].activateWindow()
+            # Unter Wayland darf sich ein Fenster nicht selbst nach vorn
+            # holen - raise() bleibt wirkungslos. showNormal() holt es
+            # wenigstens aus der Minimierung zurueck.
+            window = self.readers[key]
+            window.showNormal()
+            window.raise_()
+            window.activateWindow()
             return
         win = ReaderWindow(path, self)
         win.setAttribute(Qt.WA_DeleteOnClose)
