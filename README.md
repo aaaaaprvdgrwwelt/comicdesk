@@ -68,7 +68,11 @@ werden beim Beenden gemerkt. Ein Pfad als Startargument (`./comicdesk.sh ~/X`)
 hat Vorrang und überschreibt das gemerkte Verzeichnis für diesen Start.
 
 **Browsen** — Ordnerbaum links, mit Maus **und** Tastatur bedienbar (Pfeiltasten
-wechseln das Verzeichnis sofort mit), Cover-Kacheln in der Mitte. Thumbnails werden
+wechseln das Verzeichnis sofort mit). Rechtsklick im Baum bietet Öffnen, zu den
+Favoriten hinzufügen, hier automatisch taggen, neuer Unterordner. Ordner zeigen
+das Cover ihres ersten Comics mit kleinem Ordner-Abzeichen; abschaltbar unter
+*Ansicht → Ordner mit Cover anzeigen*, dann wird die Ansicht kompakter.
+Weiterhin: Cover-Kacheln in der Mitte. Thumbnails werden
 im Hintergrund erzeugt und in `~/.cache/comicdesk/thumbs` zwischengespeichert.
 Filterfeld oben rechts filtert nach Dateiname.
 

@@ -153,6 +153,7 @@ DE = {
     "ergaenzt durch {sources}": "ergänzt durch {sources}",
     "Wird abgebrochen …": "Wird abgebrochen …",
     "abgebrochen": "abgebrochen",
+    "Oeffnen": "Öffnen",
     "Von Hand": "Von Hand",
     "Quelle unbekannt": "Quelle unbekannt",
     "Nicht getaggt": "Nicht getaggt",
@@ -350,6 +351,11 @@ EN = {
     "Nicht getaggt": "Not tagged",
     "Quelle: {source}": "Source: {source}",
     "Quelle: {source} (Heft-ID {id})": "Source: {source} (issue ID {id})",
+
+    "Ordner mit Cover anzeigen": "Show folders with cover",
+    "Oeffnen": "Open",
+    "Hier automatisch taggen": "Auto-tag this folder",
+    "Neuer Ordner …": "New folder …",
 
     # --- Favoriten
     "Favoriten": "Favourites",

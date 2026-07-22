@@ -431,8 +431,37 @@ def open_comic(path: Path) -> ComicFile:
         _("Nicht unterstuetztes Format: {suffix}").format(suffix=path.suffix))
 
 
+def first_comic_in(folder: Path, max_depth: int = 2) -> Path | None:
+    """Erstes Comic in einem Ordner - fuer die Ordnervorschau.
+
+    Steigt begrenzt in Unterordner ab, weil Sammlungen oft
+    Serie/Staffel/Heft.cbz verschachtelt sind. Bricht beim ersten Treffer ab,
+    damit das auch auf Netzlaufwerken bezahlbar bleibt.
+    """
+    try:
+        entries = sorted(folder.iterdir(), key=lambda p: natural_key(p.name))
+    except OSError:
+        return None
+    for entry in entries:
+        if entry.is_file() and is_comic(entry):
+            return entry
+    if max_depth <= 1:
+        return None
+    for entry in entries:
+        if entry.is_dir() and not entry.name.startswith("."):
+            found = first_comic_in(entry, max_depth - 1)
+            if found is not None:
+                return found
+    return None
+
+
 def cover_bytes(path: Path) -> bytes | None:
     """Erste Seite als Bild-Bytes - fuer Thumbnails."""
+    if path.is_dir():
+        inner = first_comic_in(path)
+        if inner is None:
+            return None
+        path = inner
     comic = None
     try:
         comic = open_comic(path)

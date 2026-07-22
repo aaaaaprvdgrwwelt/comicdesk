@@ -113,7 +113,18 @@ def build_stylesheet(palette: QPalette) -> str:
         border-radius: 8px;
         outline: none;
     }}
+    /* Wer ::item umstylt, muss die Auswahl selbst zeichnen - sonst bleibt
+       nur die weisse Auswahlschrift uebrig und steht auf weissem Grund. */
     QListWidget::item {{ padding: 4px 6px; border-radius: 5px; }}
+    QListWidget::item:hover {{ background: {_mix(base, contrast, 0.06).name()}; }}
+    QListWidget::item:selected {{
+        background: {accent.name()};
+        color: {palette.color(QPalette.HighlightedText).name()};
+    }}
+    QListWidget::item:selected:!active {{
+        background: {_mix(base, accent, 0.45).name()};
+        color: {text.name()};
+    }}
 
     QHeaderView::section {{
         background: {raised.name()};

@@ -25,6 +25,10 @@ def _cache_path(path: Path) -> Path:
     try:
         st = path.stat()
         key = f"{path.resolve()}|{st.st_mtime_ns}|{st.st_size}|{THUMB_SIZE}"
+        if path.is_dir():
+            # Ordner-Zeitstempel aendert sich nur beim Hinzufuegen/Loeschen -
+            # genau dann soll die Vorschau neu bestimmt werden.
+            key += "|dir"
     except OSError:
         key = str(path)
     return cache_dir() / (hashlib.sha1(key.encode()).hexdigest() + ".png")

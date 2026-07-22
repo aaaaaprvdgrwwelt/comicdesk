@@ -12,10 +12,10 @@ from PySide6.QtGui import (
     QAction, QColor, QFont, QIcon, QKeySequence, QPainter, QPen, QPixmap,
 )
 from PySide6.QtWidgets import (
-    QAbstractItemView, QApplication, QFileSystemModel, QHBoxLayout,
-    QComboBox, QInputDialog, QLabel, QLineEdit, QListView, QListWidget,
-    QListWidgetItem, QMainWindow, QMessageBox, QSplitter, QStyle,
-    QStyledItemDelegate, QToolBar, QToolButton, QTreeView, QVBoxLayout, QWidget,
+    QAbstractItemView, QApplication, QComboBox, QFileSystemModel, QHBoxLayout,
+    QInputDialog, QLabel, QLineEdit, QListView, QListWidget, QListWidgetItem,
+    QMainWindow, QMenu, QMessageBox, QSplitter, QStyle, QStyledItemDelegate,
+    QToolBar, QToolButton, QTreeView, QVBoxLayout, QWidget,
 )
 
 from . import archive
@@ -91,29 +91,40 @@ class CoverDelegate(QStyledItemDelegate):
 
         cover_rect = QRect(rect.left() + PAD, rect.top() + PAD,
                            rect.width() - 2 * PAD, self.cover_height(index))
-        if index.data(IS_DIR_ROLE):
-            # Ordner sind keine Cover - ein kleines Symbol mittig statt eines
-            # auf Kachelgroesse aufgeblasenen Icons.
+        is_dir = bool(index.data(IS_DIR_ROLE))
+        icon = index.data(Qt.DecorationRole)
+        pm = QPixmap()
+        if isinstance(icon, QIcon):
+            avail = icon.availableSizes()
+            pm = icon.pixmap(avail[0] if avail else QSize(96, 96))
+        has_cover = not pm.isNull() and pm.width() > FOLDER_ICON_SIZE
+
+        if is_dir and not has_cover:
+            # Ohne Vorschau ein kleines Symbol mittig - nicht das System-Icon
+            # auf Kachelgroesse aufblasen.
             size = FOLDER_ICON_SIZE
-            pm = app_icon("folder", size).pixmap(size, size)
+            glyph = app_icon("folder", size).pixmap(size, size)
             painter.drawPixmap(
                 cover_rect.left() + (cover_rect.width() - size) // 2,
                 cover_rect.top() + (cover_rect.height() - size) // 2,
-                pm)
-        else:
-            icon = index.data(Qt.DecorationRole)
-            if isinstance(icon, QIcon):
-                avail = icon.availableSizes()
-                pm = icon.pixmap(avail[0] if avail else QSize(96, 96))
-                if not pm.isNull():
-                    target = pm.size().scaled(cover_rect.size(), Qt.KeepAspectRatio)
-                    x = cover_rect.left() + (cover_rect.width() - target.width()) // 2
-                    y = cover_rect.top() + (cover_rect.height() - target.height())
-                    dest = QRect(x, y, target.width(), target.height())
-                    painter.setPen(QPen(QColor(0, 0, 0, 60)))
-                    painter.setBrush(Qt.NoBrush)
-                    painter.drawPixmap(dest, pm)
-                    painter.drawRect(dest.adjusted(0, 0, -1, -1))
+                glyph)
+        elif not pm.isNull():
+            target = pm.size().scaled(cover_rect.size(), Qt.KeepAspectRatio)
+            x = cover_rect.left() + (cover_rect.width() - target.width()) // 2
+            y = cover_rect.top() + (cover_rect.height() - target.height())
+            dest = QRect(x, y, target.width(), target.height())
+            painter.setPen(QPen(QColor(0, 0, 0, 60)))
+            painter.setBrush(Qt.NoBrush)
+            painter.drawPixmap(dest, pm)
+            painter.drawRect(dest.adjusted(0, 0, -1, -1))
+            if is_dir:
+                # Sonst ist ein Ordner von einem Heft nicht zu unterscheiden.
+                badge = QRect(dest.left() + 4, dest.top() + 4, 22, 22)
+                painter.setPen(Qt.NoPen)
+                painter.setBrush(QColor(0, 0, 0, 130))
+                painter.drawRoundedRect(badge, 5, 5)
+                painter.drawPixmap(badge.adjusted(3, 3, -3, -3),
+                                   _folder_badge().pixmap(16, 16))
 
         fm = option.fontMetrics
         text_rect = QRect(rect.left() + 4, cover_rect.bottom() + PAD,
@@ -178,6 +189,28 @@ def _wrap_lines(text: str, fm, width: int, max_lines: int) -> list[str]:
     return lines
 
 
+_badge_cache: dict[str, QIcon] = {}
+
+
+def _folder_badge() -> QIcon:
+    """Weisses Ordnersymbol fuer die Ecke einer Ordner-Vorschau."""
+    if "badge" not in _badge_cache:
+        from .icons import PATHS, _TEMPLATE
+        from PySide6.QtCore import QByteArray, QRectF
+        from PySide6.QtGui import QPainter as _P
+        from PySide6.QtSvg import QSvgRenderer
+
+        svg = _TEMPLATE.format(color="#ffffff", body=PATHS["folder"])
+        renderer = QSvgRenderer(QByteArray(svg.encode()))
+        pixmap = QPixmap(32, 32)
+        pixmap.fill(Qt.transparent)
+        painter = _P(pixmap)
+        renderer.render(painter, QRectF(pixmap.rect()))
+        painter.end()
+        _badge_cache["badge"] = QIcon(pixmap)
+    return _badge_cache["badge"]
+
+
 # ---------------------------------------------------------------------------
 class ComicListModel(QAbstractListModel):
     def __init__(self, loader: ThumbLoader, parent=None):
@@ -192,16 +225,29 @@ class ComicListModel(QAbstractListModel):
         self.status: dict[str, tuple[bool, str | None]] = {}
         #: Reine Ordneransicht - dann reichen niedrigere Kacheln.
         self.compact = False
+        #: Ordner mit dem Cover ihres ersten Comics zeigen.
+        self.folder_covers = True
+        #: Einmal ermittelt statt bei jedem Neuzeichnen - auf Netzlaufwerken
+        #: ist jedes is_dir() ein Netzzugriff.
+        self._dirs: set[str] = set()
         loader.ready.connect(self._on_thumb)
 
     def set_entries(self, entries: list[Path], show_parent: bool = False,
-                    status: dict[str, tuple[bool, str | None]] | None = None) -> None:
+                    status: dict[str, tuple[bool, str | None]] | None = None,
+                    dirs: set[str] | None = None) -> None:
         self.beginResetModel()
         self.entries = entries
         self.show_parent = show_parent
         self.status = status or {}
-        self.compact = bool(entries) and all(p.is_dir() for p in entries)
+        # Der Aufrufer weiss meist schon, was Ordner sind; sonst einmal fragen.
+        self._dirs = dirs if dirs is not None else {
+            str(p) for p in entries if p.is_dir()}
+        self.compact = (bool(entries) and not self.folder_covers
+                        and len(self._dirs) == len(entries))
         self.endResetModel()
+
+    def is_dir(self, path: Path) -> bool:
+        return str(path) in self._dirs
 
     def rowCount(self, parent=QModelIndex()) -> int:  # noqa: N802
         return 0 if parent.isValid() else len(self.entries)
@@ -222,12 +268,17 @@ class ComicListModel(QAbstractListModel):
         if role == SUBTITLE_ROLE:
             return p.parent.name if self.show_parent else None
         if role == IS_DIR_ROLE:
-            return p.is_dir()
+            return self.is_dir(p)
         if role == STATUS_ROLE:
-            return None if p.is_dir() else self.status.get(str(p))
+            return None if self.is_dir(p) else self.status.get(str(p))
         if role == Qt.DecorationRole:
-            if p.is_dir():
-                return self.folder_icon
+            if self.is_dir(p):
+                if not self.folder_covers:
+                    return self.folder_icon
+                pm = self.loader.get(p)
+                if pm is None or pm.isNull():
+                    return self.folder_icon
+                return QIcon(pm)
             pm = self.loader.get(p)
             if pm is None:
                 return self.file_icon
@@ -293,6 +344,8 @@ class MainWindow(QMainWindow):
         for col in range(1, self.fs_model.columnCount()):
             self.tree.hideColumn(col)
         self.tree.setHeaderHidden(True)
+        self.tree.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.tree.customContextMenuRequested.connect(self._tree_menu)
         self.tree.clicked.connect(self._tree_selected)
         # currentChanged deckt auch Pfeiltasten und Pos1/Ende ab -
         # clicked allein reagiert nur auf die Maus.
@@ -476,6 +529,14 @@ class MainWindow(QMainWindow):
         menu = bar.addMenu(_("&Ansicht"))
         menu.addAction(a["search"])
         menu.addAction(a["untagged"])
+        menu.addSeparator()
+        self.action_folder_covers = QAction(_("Ordner mit Cover anzeigen"), self)
+        self.action_folder_covers.setCheckable(True)
+        self.action_folder_covers.setChecked(
+            str(self.settings.value("folder_covers", "true")).lower() != "false")
+        self.action_folder_covers.toggled.connect(self._toggle_folder_covers)
+        menu.addAction(self.action_folder_covers)
+        self.model.folder_covers = self.action_folder_covers.isChecked()
         self.action_search_mode = QAction(_("In der Sammlung suchen"), self)
         self.action_search_mode.setCheckable(True)
         self.action_search_mode.toggled.connect(self.search_toggle.setChecked)
@@ -562,6 +623,12 @@ class MainWindow(QMainWindow):
         self.filter_edit.setText("getaggt:nein")
         self.filter_edit.setFocus()
 
+    def _toggle_folder_covers(self, on: bool) -> None:
+        self.settings.setValue("folder_covers", on)
+        self.model.folder_covers = on
+        self.loader.clear_queue()
+        self.refresh()
+
     def focus_search(self) -> None:
         self.search_toggle.setChecked(True)
         self.filter_edit.selectAll()
@@ -589,7 +656,8 @@ class MainWindow(QMainWindow):
             dirs = [p for p in dirs if needle in p.name.lower()]
             comics = [p for p in comics if needle in p.name.lower()]
         self.model.set_entries(dirs + comics,
-                               status=self.index.status_for(comics))
+                               status=self.index.status_for(comics),
+                               dirs={str(p) for p in dirs})
         self.meta.clear()
         status = self.model.status
         untagged = sum(1 for c in comics if not status.get(str(c), (False, None))[0])
@@ -620,7 +688,8 @@ class MainWindow(QMainWindow):
                 _("Suche fehlgeschlagen: {error}").format(error=exc), 6000)
             return
         self.model.set_entries(hits, show_parent=True,
-                               status=self.index.status_for(hits))
+                               status=self.index.status_for(hits),
+                               dirs=set())
         self.meta.clear()
         self.statusBar().showMessage(
             _("{hits} Treffer von {total} indizierten Comics").format(
@@ -649,6 +718,71 @@ class MainWindow(QMainWindow):
     def _load_metadata_now(self) -> None:
         paths = [p for p in self.selected_paths() if p.is_file()]
         self.meta.load(paths[0] if len(paths) == 1 else None)
+
+    def _tree_menu(self, pos) -> None:
+        """Kontextmenue fuer den rechtsgeklickten Ordner - nicht fuer den
+        gerade ausgewaehlten."""
+        index = self.tree.indexAt(pos)
+        if not index.isValid():
+            return
+        menu = self.build_tree_menu(Path(self.fs_model.filePath(index)), index)
+        menu.exec(self.tree.viewport().mapToGlobal(pos))
+
+    def build_tree_menu(self, folder: Path, index: QModelIndex) -> QMenu:
+        menu = QMenu(self.tree)
+
+        def add(text, slot, icon=None):
+            action = QAction(_(text), menu)
+            if icon:
+                action.setIcon(app_icon(icon))
+            action.triggered.connect(slot)
+            menu.addAction(action)
+            return action
+
+        add("Oeffnen", lambda: self.set_directory(folder), "folder")
+        menu.addSeparator()
+        if self.favorites.contains(folder):
+            add("Aus Favoriten entfernen",
+                lambda: self._set_favorite(folder, False), "star")
+        else:
+            add("Zu Favoriten hinzufuegen",
+                lambda: self._set_favorite(folder, True), "star_off")
+        menu.addSeparator()
+        add("Hier automatisch taggen", lambda: self._tag_folder(folder), "tag")
+        add("Neuer Ordner …", lambda: self._new_folder_in(folder), "folder_new")
+        menu.addSeparator()
+        add("Aktualisieren", lambda: self._reload_tree(index), "refresh")
+        return menu
+
+    def _set_favorite(self, folder: Path, add: bool) -> None:
+        if add:
+            self.favorites.add(folder)
+        else:
+            self.favorites.remove(folder)
+        self.refresh_favorites()
+
+    def _tag_folder(self, folder: Path) -> None:
+        self.set_directory(folder)
+        self.view.clearSelection()
+        self.auto_tag()
+
+    def _new_folder_in(self, folder: Path) -> None:
+        name, ok = QInputDialog.getText(self, _("Neuer Ordner"), _("Name:"))
+        if not ok or not name.strip():
+            return
+        try:
+            (folder / name.strip()).mkdir()
+        except OSError as exc:
+            QMessageBox.critical(self, _("Neuer Ordner"), str(exc))
+            return
+        self._reload_tree(self.fs_model.index(str(folder)))
+        if folder == self.current_dir:
+            self.refresh()
+
+    def _reload_tree(self, index: QModelIndex) -> None:
+        self.fs_model.setRootPath("")
+        self.tree.collapse(index)
+        self.tree.expand(index)
 
     def _tree_selected(self, index: QModelIndex) -> None:
         if not index.isValid():
