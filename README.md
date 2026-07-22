@@ -358,7 +358,10 @@ Quelle nicht füllt, und deine eigenen freien Tags bleiben erhalten.
 - `comicdesk/icons.py` – selbst gezeichnete SVG-Icons (Theme-unabhängig)
 - `comicdesk/appicon.py`, `comicdesk/assets/` – Programmsymbol; unter 32 px
   wird eine vereinfachte Zeichnung benutzt, weil die ausführliche dort
-  zerfällt
+  zerfällt. `install-desktop.sh` legt die PNGs samt `index.theme` im
+  hicolor-Thema ab — unter Wayland kann eine Anwendung ihr Fenstersymbol nicht
+  selbst setzen, der Compositor sucht es über die `app_id` in der
+  `.desktop`-Datei
 
 Neue Sprache: in `i18n.py` ein Dict nach dem Muster von `EN` anlegen und in
 `LANGUAGES` und `TABLE` eintragen. Schlüssel sind die deutschen Quelltext-

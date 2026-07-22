@@ -34,6 +34,20 @@ def icon() -> QIcon:
     return result
 
 
+def _index_theme(sizes: tuple[int, ...]) -> str:
+    """Ohne index.theme ist der Ordner kein gueltiges Icon-Thema - dann findet
+    der Compositor das Symbol nicht, egal wie viele PNGs darin liegen."""
+    folders = [f"{size}x{size}/apps" for size in sizes] + ["scalable/apps"]
+    lines = ["[Icon Theme]", "Name=Hicolor", "Comment=Fallback icon theme",
+             "Hidden=true", "Directories=" + ",".join(folders), ""]
+    for size in sizes:
+        lines += [f"[{size}x{size}/apps]", f"Size={size}",
+                  "Context=Applications", "Type=Fixed", ""]
+    lines += ["[scalable/apps]", "Size=48", "MinSize=8", "MaxSize=512",
+              "Context=Applications", "Type=Scalable", ""]
+    return "\n".join(lines)
+
+
 def install(target: Path | None = None) -> list[Path]:
     """PNGs ins Icon-Thema legen, damit Menue und Fensterleiste sie finden."""
     base = target or (Path.home() / ".local" / "share" / "icons" / "hicolor")
@@ -51,6 +65,10 @@ def install(target: Path | None = None) -> list[Path]:
     target_svg = scalable / "comicdesk.svg"
     target_svg.write_bytes(DETAILED.read_bytes())
     written.append(target_svg)
+
+    index = base / "index.theme"
+    index.write_text(_index_theme(SMALL_SIZES + LARGE_SIZES), "utf-8")
+    written.append(index)
     return written
 
 
