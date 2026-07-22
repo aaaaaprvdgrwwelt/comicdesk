@@ -243,6 +243,7 @@ class MetaPanel(QWidget):
                 if name:
                     md.add_credit(name, role)
         md.is_empty = False
+        provenance.stamp_manual(md)
         return md
 
     def save(self) -> None:

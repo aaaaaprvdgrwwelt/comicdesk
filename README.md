@@ -103,11 +103,17 @@ indizierten Ordner hinweg, nicht nur im aktuellen. Siehe unten. `Strg+G`
 springt vom Suchtreffer in dessen Ordner.
 
 **Herkunft der Tags** — jede Kachel trägt oben rechts einen Punkt: blau für
-ComicVine, grün für GCD, grau für von Hand eingetragen, orange mit
-Ausrufezeichen für ungetaggt. Im Metadaten-Panel steht die Quelle im Klartext,
+ComicVine, grün für GCD, dunkelgrau für in ComicDesk von Hand eingetragen,
+hellgrau für getaggt ohne erkennbare Quelle, orange mit Ausrufezeichen für
+ungetaggt. Im Metadaten-Panel steht die Quelle im Klartext,
 bei automatisch getaggten Dateien mit der Heft-ID. Erkannt wird das am
 `Notes`-Feld; Dateien, die ComicTagger getaggt hat, werden ebenfalls erkannt.
-Es wird nichts dafür geschrieben, die Erkennung liest nur.
+Für vorhandene Dateien wird nichts geschrieben, die Erkennung liest nur.
+Speicherst du selbst im Tag-Editor, hinterlässt ComicDesk die Marke
+`[ComicDesk: von Hand]` im `Notes`-Feld — vorhandene Notizen bleiben erhalten,
+eine schon erkannte Quelle wird nicht überschrieben. Tags ohne jeden Hinweis
+gelten als „Quelle unbekannt"; „von Hand" wird nur behauptet, wo es belegt
+ist.
 
 **Ungetaggte finden** — *Ansicht → Ungetaggte anzeigen* (`Strg+U`), oder die
 Suche `getaggt:nein`. Die Statuszeile zeigt beim Browsen nebenbei, wie viele

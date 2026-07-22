@@ -16,9 +16,16 @@ from .i18n import _
 COMICVINE = "comicvine"
 GCD = "gcd"
 MANUAL = "manual"
+#: Getaggt, aber ohne jeden Hinweis worauf - ehrlicher als "von Hand" zu raten.
+UNKNOWN = "unknown"
+
+#: Wird beim Speichern im Tag-Editor gesetzt, damit spaetere Laeufe wissen,
+#: dass hier ein Mensch am Werk war.
+MANUAL_MARKER = "[ComicDesk: von Hand]"
 
 #: Reihenfolge zaehlt - die eigenen Marker sind eindeutiger als die Heuristik.
 _PATTERNS = [
+    (MANUAL, re.compile(re.escape(MANUAL_MARKER))),
     (COMICVINE, re.compile(r"ComicVine issue id (\d+)")),
     (GCD, re.compile(r"GCD issue id (\d+)")),
     (COMICVINE, re.compile(r"comic\s*vine", re.IGNORECASE)),
@@ -37,6 +44,7 @@ def label(source: str | None) -> str:
         COMICVINE: "ComicVine",
         GCD: _("Grand Comics Database"),
         MANUAL: _("Von Hand"),
+        UNKNOWN: _("Quelle unbekannt"),
     }.get(source or "", _("Nicht getaggt"))
 
 
@@ -54,7 +62,18 @@ def detect(md: GenericMetadata) -> tuple[str | None, str | None]:
     for source, needle in _LINK_HINTS:
         if needle in link:
             return source, None
-    return MANUAL, None
+    # Tags sind da, aber nichts verraet woher - nicht als "von Hand" ausgeben.
+    return UNKNOWN, None
+
+
+def stamp_manual(md: GenericMetadata) -> None:
+    """Beim Speichern von Hand einen Marker setzen, ohne Vorhandenes zu loeschen."""
+    if detect(md)[0] not in (None, UNKNOWN):
+        return
+    notes = (md.notes or "").strip()
+    if MANUAL_MARKER in notes:
+        return
+    md.notes = f"{notes} {MANUAL_MARKER}".strip()
 
 
 def describe(md: GenericMetadata) -> str:

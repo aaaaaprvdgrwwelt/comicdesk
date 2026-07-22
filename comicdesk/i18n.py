@@ -150,6 +150,7 @@ DE = {
         "Sammlung „{name}“ mit {count} indizierten Comics löschen?\n\n"
         "Die Comic-Dateien selbst bleiben unangetastet.",
     "Von Hand": "Von Hand",
+    "Quelle unbekannt": "Quelle unbekannt",
     "Nicht getaggt": "Nicht getaggt",
     "Ueber ComicDesk": "Über ComicDesk",
     "Sprache": "Sprache",
@@ -304,6 +305,7 @@ EN = {
     # --- Herkunft der Tags
     "Grand Comics Database": "Grand Comics Database",
     "Von Hand": "Entered by hand",
+    "Quelle unbekannt": "Source unknown",
     "Nicht getaggt": "Not tagged",
     "Quelle: {source}": "Source: {source}",
     "Quelle: {source} (Heft-ID {id})": "Source: {source} (issue ID {id})",

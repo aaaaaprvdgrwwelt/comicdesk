@@ -44,7 +44,8 @@ STATUS_ROLE = Qt.UserRole + 2
 SOURCE_COLORS = {
     "comicvine": QColor(60, 130, 200),
     "gcd": QColor(70, 155, 95),
-    "manual": QColor(150, 150, 150),
+    "manual": QColor(120, 120, 120),
+    "unknown": QColor(185, 185, 185),
 }
 
 SEARCH_PLACEHOLDER = "Sammlung durchsuchen – z. B. serie:batman jahr:1990-1999 joker"
