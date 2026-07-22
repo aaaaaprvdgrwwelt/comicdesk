@@ -425,6 +425,7 @@ class MainWindow(QMainWindow):
         self.view.selectionModel().selectionChanged.connect(self._selection_changed)
 
         self.path_edit = QLineEdit()
+        self.path_edit.setMinimumWidth(240)
         self.path_edit.returnPressed.connect(
             lambda: self.set_directory(Path(self.path_edit.text()).expanduser())
         )
@@ -434,7 +435,9 @@ class MainWindow(QMainWindow):
         self.filter_edit.setMinimumWidth(320)
 
         self.search_toggle = QToolButton()
-        self.search_toggle.setText(_("Sammlung"))
+        self.search_toggle.setText(_("Suchen"))
+        self.search_toggle.setIcon(app_icon("search"))
+        self.search_toggle.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
         self.search_toggle.setCheckable(True)
         self.search_toggle.setToolTip(_(
             "Statt im aktuellen Ordner in der gesamten indizierten Sammlung "
@@ -444,15 +447,19 @@ class MainWindow(QMainWindow):
         bar = QHBoxLayout()
         bar.setContentsMargins(6, 4, 6, 4)
         bar.addWidget(QLabel(_("Ordner:")))
-        bar.addWidget(self.path_edit, 1)
+        bar.addWidget(self.path_edit, 2)
         self.collection_box = QComboBox()
-        self.collection_box.setMinimumWidth(150)
-        self.collection_box.setToolTip(
-            _("In welcher Sammlung gesucht wird"))
+        self.collection_box.setMinimumWidth(170)
+        self.collection_box.setToolTip(_(
+            "Waehlt die Sammlung: springt in ihren Ordner und begrenzt die "
+            "Suche darauf."))
         self.collection_box.activated.connect(self._collection_chosen)
-        bar.addWidget(self.search_toggle)
+        self.collection_label = QLabel(_("Sammlung:"))
+        bar.addWidget(self.collection_label)
         bar.addWidget(self.collection_box)
-        bar.addWidget(self.filter_edit, 1)
+        bar.addSpacing(12)
+        bar.addWidget(self.search_toggle)
+        bar.addWidget(self.filter_edit, 3)
 
         center = QWidget()
         cv = QVBoxLayout(center)
@@ -532,7 +539,7 @@ class MainWindow(QMainWindow):
                              self.prune_favorites),
             "convert": act("Nach CBZ konvertieren", None, self.convert_selected,
                            on_view=True),
-            "index": act("Sammlung indizieren …", None, self.edit_index, "index"),
+            "index": act("Sammlungen …", "Ctrl+Shift+M", self.edit_index, "index"),
             "settings": act("Einstellungen …", "Ctrl+,", self.edit_settings,
                             "settings"),
             "about": act("Ueber ComicDesk", None, self.show_about),
@@ -577,10 +584,11 @@ class MainWindow(QMainWindow):
         menu.addAction(self.action_search_mode)
 
         menu = bar.addMenu(_("E&xtras"))
+        menu.addAction(a["index"])
+        menu.addSeparator()
         for key in ("autotag", "rename_tpl", "pages", "convert"):
             menu.addAction(a[key])
         menu.addSeparator()
-        menu.addAction(a["index"])
         menu.addAction(a["settings"])
 
         bar.addMenu(_("&Hilfe")).addAction(a["about"])
@@ -638,7 +646,6 @@ class MainWindow(QMainWindow):
         return self.search_toggle.isChecked()
 
     def _toggle_search_mode(self, on: bool) -> None:
-        self.collection_box.setVisible(on)
         self.filter_edit.setPlaceholderText(
             _(SEARCH_PLACEHOLDER if on else FILTER_PLACEHOLDER))
         # Ordnerfilter und Sammlungssuche haben verschiedene Abfragesprachen;
@@ -1131,7 +1138,6 @@ class MainWindow(QMainWindow):
         index = self.collection_box.findData(wanted if wanted in names else "")
         self.collection_box.setCurrentIndex(max(0, index))
         self.collection_box.blockSignals(False)
-        self.collection_box.setVisible(self.search_mode)
 
     @property
     def active_collection(self) -> str | None:
@@ -1145,6 +1151,19 @@ class MainWindow(QMainWindow):
             self.edit_index()
             return
         self.settings.setValue("active_collection", self.active_collection or "")
+        if not self.search_mode:
+            # Beim Blaettern ist die Sammlung sonst wirkungslos - dann soll die
+            # Auswahl wenigstens dorthin fuehren.
+            self._go_to_collection(self.active_collection)
+            return
+        self.refresh()
+
+    def _go_to_collection(self, name: str | None) -> None:
+        entry = self.index.collection(name) if name else None
+        for root in (entry.paths if entry else []):
+            if root.is_dir():
+                self.set_directory(root)
+                return
         self.refresh()
 
     # --- Favoriten ----------------------------------------------------

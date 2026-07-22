@@ -154,6 +154,7 @@ DE = {
     "Wird abgebrochen …": "Wird abgebrochen …",
     "abgebrochen": "abgebrochen",
     "Oeffnen": "Öffnen",
+    "Sammlungen …": "Sammlungen …",
     "Von Hand": "Von Hand",
     "Quelle unbekannt": "Quelle unbekannt",
     "Nicht getaggt": "Nicht getaggt",
@@ -315,6 +316,12 @@ EN = {
     # --- Sammlungen
     "Sammlungen": "Collections",
     "Sammlungen verwalten …": "Manage collections …",
+    "Sammlungen …": "Collections …",
+    "Sammlung:": "Collection:",
+    "Waehlt die Sammlung: springt in ihren Ordner und begrenzt die Suche "
+    "darauf.":
+        "Picks the collection: jumps to its folder and limits the search to "
+        "it.",
     "Alle Sammlungen": "All collections",
     "In welcher Sammlung gesucht wird": "Which collection is searched",
     "Jede Sammlung hat eigene Ordner. Beim Indizieren werden sie rekursiv "

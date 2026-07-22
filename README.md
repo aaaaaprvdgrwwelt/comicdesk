@@ -161,7 +161,12 @@ Für CBR/CB7 wird das `7z`-Kommando gebraucht:
 
 ## Sammlungen
 
-Unter *Extras → Sammlungen* legst du beliebig viele benannte Sammlungen an,
+Die Sammlung wählst du oben in der Leiste — sie springt in deren Ordner und
+begrenzt zugleich die Suche darauf; „Alle Sammlungen" sucht überall. Der
+letzte Eintrag der Liste führt zur Verwaltung, ebenso *Extras → Sammlungen …*
+(`Strg+Umschalt+M`).
+
+Dort legst du beliebig viele benannte Sammlungen an,
 jede mit eigenen Ordnern — etwa „US-Comics" und „Kinderkram". Die Auswahl oben
 bestimmt, worin gesucht wird; „Alle Sammlungen" sucht überall. Umbenennen und
 Löschen einer Sammlung lässt die Comic-Dateien selbst unangetastet, entfernt
