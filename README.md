@@ -113,6 +113,12 @@ werden vor dem Senden auf 1400 px verkleinert — spart Token, ohne der
 Erkennung zu schaden. Eine Seite liegt je nach Modell bei Bruchteilen eines
 Cents.
 
+Modelle übersehen gelegentlich eine Sprechblase — an einer Testseite lieferte
+dasselbe Modell in vier Läufen 2, 14, 14 und 14 Stellen. Deshalb gibt es im
+Panel **„Nochmal übersetzen"**: fragt erneut und behält das vollständigere
+Ergebnis. Die Temperatur steht auf 0, was die Schwankung dämpft, aber nicht
+beseitigt.
+
 Das Modell liefert zu jeder Textstelle einen **Rahmen**; daraus berechnet
 ComicDesk die Lesereihenfolge selbst (zeilenweise von oben, innerhalb einer
 Zeile links nach rechts — bei als Manga getaggten Comics umgekehrt) und

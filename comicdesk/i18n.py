@@ -483,6 +483,11 @@ EN = {
     "Einzutragen unter Extras › Einstellungen › Übersetzung.":
         "Enter it under Tools › Settings › Translation.",
     "Wird übersetzt …": "Translating …",
+    "Nochmal übersetzen": "Translate again",
+    "Fragt das Modell erneut und behält das vollständigere Ergebnis. Hilft, "
+    "wenn Sprechblasen fehlen.":
+        "Asks the model again and keeps the more complete result. Helps when "
+        "speech bubbles are missing.",
     "Übersetzungen konnten nicht beim Comic gespeichert werden:\n{error}":
         "Translations could not be stored with the comic:\n{error}",
     "Kein Text auf dieser Seite.": "No text on this page.",

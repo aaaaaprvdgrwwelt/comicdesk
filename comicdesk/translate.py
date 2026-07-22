@@ -366,22 +366,34 @@ class Translator:
             return False, _("Kein OpenRouter-Schlüssel hinterlegt.")
         return True, ""
 
-    def page(self, image: bytes, attempts: int = 2) -> list[Bubble]:
-        """Eine Seite uebersetzen. Was schon uebersetzt ist, holt der Aufrufer
-        aus dem PageStore beim Comic - hier wird nichts zwischengespeichert.
+    def page(self, image: bytes, attempts: int = 2,
+             best_of: int = 1) -> list[Bubble]:
+        """Eine Seite uebersetzen.
 
-        Die Modelle antworten nicht deterministisch; ein zweiter Versuch kostet
-        Bruchteile eines Cents und faengt Ausrutscher ab.
+        Die Modelle antworten nicht deterministisch und uebersehen mal eine
+        Blase: an einer Testseite lieferte dasselbe Modell 2, 14, 14 und 14
+        Stellen. `attempts` faengt Fehlschlaege ab, `best_of` laesst mehrfach
+        laufen und nimmt den vollstaendigsten Lauf - das kostet entsprechend
+        mehr und wird deshalb nur auf Wunsch gemacht.
         """
+        bester: list[Bubble] | None = None
         letzter: Exception | None = None
-        for versuch in range(max(1, attempts)):
-            try:
-                return self._once(image)
-            except TranslationError as exc:
-                letzter = exc
-                if "JSON" not in str(exc) and "abgebrochen" not in str(exc):
-                    raise
-        raise letzter
+        for _durchgang in range(max(1, best_of)):
+            for _versuch in range(max(1, attempts)):
+                try:
+                    ergebnis = self._once(image)
+                except TranslationError as exc:
+                    letzter = exc
+                    if "JSON" not in str(exc) and "abgebrochen" not in str(exc):
+                        raise
+                    continue
+                if bester is None or len(ergebnis) > len(bester):
+                    bester = ergebnis
+                break
+        if bester is None:
+            raise letzter or TranslationError(
+                _("Antwort des Modells war kein gültiges JSON."))
+        return bester
 
     def _once(self, image: bytes) -> list[Bubble]:
         payload, mime = _shrink(image)
@@ -397,7 +409,7 @@ class Translator:
                      "image_url": {"url": f"data:{mime};base64,{encoded}"}},
                 ],
             }],
-            "temperature": 0.2,
+            "temperature": 0,
         }
         response = self._session.post(
             API_URL, json=body, timeout=TIMEOUT,

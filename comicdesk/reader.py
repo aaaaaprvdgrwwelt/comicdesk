@@ -12,8 +12,8 @@ from PySide6.QtGui import (
     QAction, QColor, QFont, QImage, QKeySequence, QPainter, QPen, QPixmap,
 )
 from PySide6.QtWidgets import (
-    QLabel, QMainWindow, QMessageBox, QScrollArea, QSizePolicy, QSplitter,
-    QTextBrowser, QToolBar, QVBoxLayout, QWidget,
+    QHBoxLayout, QLabel, QMainWindow, QMessageBox, QPushButton, QScrollArea,
+    QSizePolicy, QSplitter, QTextBrowser, QToolBar, QVBoxLayout, QWidget,
 )
 
 from .archive import ComicError, ComicFile, open_comic
@@ -107,6 +107,15 @@ class ReaderWindow(QMainWindow):
         self.translation_title.setStyleSheet("font-weight:600;")
         side_layout.addWidget(self.translation_title)
         side_layout.addWidget(self.translation_view, 1)
+        knopfreihe = QHBoxLayout()
+        self.btn_retranslate = QPushButton(_("Nochmal übersetzen"))
+        self.btn_retranslate.setToolTip(_(
+            "Fragt das Modell erneut und behält das vollständigere Ergebnis. "
+            "Hilft, wenn Sprechblasen fehlen."))
+        self.btn_retranslate.clicked.connect(self.retranslate)
+        knopfreihe.addWidget(self.btn_retranslate)
+        knopfreihe.addStretch(1)
+        side_layout.addLayout(knopfreihe)
         self.translation_side = side
         side.setVisible(False)
 
@@ -185,11 +194,15 @@ class ReaderWindow(QMainWindow):
         else:
             self._stop_translation()
 
+    def retranslate(self) -> None:
+        """Erneut fragen und den vollstaendigeren Lauf behalten."""
+        self._request_translation(force=True)
+
     def _stop_translation(self) -> None:
         stop_and_detach(self, self._tr_thread, self._tr_worker)
         self._tr_thread = self._tr_worker = None
 
-    def _request_translation(self) -> None:
+    def _request_translation(self, force: bool = False) -> None:
         if not self.a_translate.isChecked() or self.comic is None:
             return
         index = self.index
@@ -205,7 +218,7 @@ class ReaderWindow(QMainWindow):
         if self._store is None:
             self._store = PageStore(self.comic)
         gespeichert = self._store.get(data, settings.language)
-        if gespeichert is not None:
+        if gespeichert is not None and not force:
             self._show_bubbles(gespeichert)
             return
 
@@ -222,10 +235,12 @@ class ReaderWindow(QMainWindow):
                 why + "\n\n" + _("Einzutragen unter Extras › Einstellungen › "
                                   "Übersetzung."))
             return
-        self._pending = (index, data, settings.language)
+        self._pending = (index, data, settings.language,
+                         gespeichert if force else None)
 
         self._stop_translation()
         self.translation_view.setPlainText(_("Wird übersetzt …"))
+        self.btn_retranslate.setEnabled(False)
         self._tr_thread = QThread()
         self._tr_worker = _TranslateWorker(translator, index, data)
         self._tr_worker.moveToThread(self._tr_thread)
@@ -238,12 +253,18 @@ class ReaderWindow(QMainWindow):
             self._tr_thread.quit()
             self._tr_thread.wait(2000)
         self._tr_thread = self._tr_worker = None
+        self.btn_retranslate.setEnabled(True)
         if error:
             self.translation_view.setPlainText(error)
             return
         pending = getattr(self, "_pending", None)
-        if self._store is not None and pending and pending[0] == index:
-            self._store.put(pending[1], pending[2], bubbles)
+        if pending and pending[0] == index:
+            vorher = pending[3]
+            if vorher is not None and len(vorher) >= len(bubbles):
+                # Der neue Lauf ist nicht besser - das Bisherige behalten.
+                bubbles = vorher
+            elif self._store is not None:
+                self._store.put(pending[1], pending[2], bubbles)
         if index == self.index:
             self._show_bubbles(bubbles)
 
