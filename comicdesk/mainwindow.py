@@ -190,6 +190,27 @@ def _wrap_lines(text: str, fm, width: int, max_lines: int) -> list[str]:
     return lines
 
 
+#: Ab so vielen Treffern im selben Ordner lohnt ein eigener Reihen-Treffer.
+SERIES_HIT_MIN = 2
+
+
+def _group_hits(hits: list[Path]) -> tuple[list[Path], list[Path], dict[str, str]]:
+    """Treffer nach Ordner buendeln: erst die Reihen, dann die Ausgaben.
+
+    Wer nach "batman" sucht, will meist die Reihe, nicht 40 Einzelhefte -
+    beides zu zeigen ist nuetzlicher als nur eines davon.
+    """
+    from collections import Counter
+
+    counts = Counter(hit.parent for hit in hits)
+    folders = sorted((folder for folder, number in counts.items()
+                      if number >= SERIES_HIT_MIN),
+                     key=lambda f: (-counts[f], f.name.casefold()))
+    subtitles = {str(folder): _("{count} Hefte").format(count=counts[folder])
+                 for folder in folders}
+    return folders, folders + hits, subtitles
+
+
 _badge_cache: dict[str, QIcon] = {}
 
 
@@ -224,6 +245,8 @@ class ComicListModel(QAbstractListModel):
         self.show_parent = False
         #: Pfad -> (hat Tags, Quelle); leer heisst "nicht im Index".
         self.status: dict[str, tuple[bool, str | None]] = {}
+        #: Pfad -> Text unter dem Namen; sonst greift show_parent.
+        self.subtitles: dict[str, str] = {}
         #: Reine Ordneransicht - dann reichen niedrigere Kacheln.
         self.compact = False
         #: Ordner mit dem Cover ihres ersten Comics zeigen.
@@ -235,11 +258,13 @@ class ComicListModel(QAbstractListModel):
 
     def set_entries(self, entries: list[Path], show_parent: bool = False,
                     status: dict[str, tuple[bool, str | None]] | None = None,
-                    dirs: set[str] | None = None) -> None:
+                    dirs: set[str] | None = None,
+                    subtitles: dict[str, str] | None = None) -> None:
         self.beginResetModel()
         self.entries = entries
         self.show_parent = show_parent
         self.status = status or {}
+        self.subtitles = subtitles or {}
         # Der Aufrufer weiss meist schon, was Ordner sind; sonst einmal fragen.
         self._dirs = dirs if dirs is not None else {
             str(p) for p in entries if p.is_dir()}
@@ -267,6 +292,9 @@ class ComicListModel(QAbstractListModel):
         if role == Qt.ToolTipRole:
             return str(p)
         if role == SUBTITLE_ROLE:
+            own = self.subtitles.get(str(p))
+            if own is not None:
+                return own
             return p.parent.name if self.show_parent else None
         if role == IS_DIR_ROLE:
             return self.is_dir(p)
@@ -694,13 +722,19 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(
                 _("Suche fehlgeschlagen: {error}").format(error=exc), 6000)
             return
-        self.model.set_entries(hits, show_parent=True,
+        folders, entries, subtitles = _group_hits(hits)
+        self.model.set_entries(entries, show_parent=True,
                                status=self.index.status_for(hits),
-                               dirs=set())
+                               dirs={str(f) for f in folders},
+                               subtitles=subtitles)
         self.meta.clear()
-        self.statusBar().showMessage(
-            _("{hits} Treffer von {total} indizierten Comics").format(
-                hits=len(hits), total=indexed))
+        message = _("{hits} Treffer von {total} indizierten Comics").format(
+            hits=len(hits), total=indexed)
+        if folders:
+            message = _("{series} Reihen und {hits} Ausgaben von {total} "
+                        "indizierten Comics").format(
+                series=len(folders), hits=len(hits), total=indexed)
+        self.statusBar().showMessage(message)
 
     # ------------------------------------------------------------------
     def selected_paths(self) -> list[Path]:

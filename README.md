@@ -202,6 +202,10 @@ Suchsyntax — Feldsuchen und freier Text lassen sich mischen:
 | `quelle:comicvine` | woher die Tags stammen (`comicvine`, `gcd`, `manual`) |
 | `serie:batman jahr:2019 joker` | alles kombinierbar (UND) |
 
+Treffer erscheinen zweistufig: erst die **Reihen** (Ordner mit mindestens zwei
+Treffern) mit Cover und Heftzahl, darunter die einzelnen Ausgaben. Ein Klick
+auf eine Reihe springt in den Ordner.
+
 Weitere Präfixe: `nummer:` `genre:` `sprache:` `imprint:` `arc:` `datei:`.
 Die englischen Namen (`series:` `year:` `publisher:` …) funktionieren ebenso.
 

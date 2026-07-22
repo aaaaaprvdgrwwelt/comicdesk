@@ -364,6 +364,9 @@ EN = {
     "geprüft":
         "{shown} of {total} series shown · {checked} checked against a source",
     "{count} Hefte, {span}": "{count} issues, {span}",
+    "{count} Hefte": "{count} issues",
+    "{series} Reihen und {hits} Ausgaben von {total} indizierten Comics":
+        "{series} series and {hits} issues out of {total} indexed comics",
     "Die Heftnummern dieser Reihe sind uneinheitlich (etwa fortlaufend und "
     "nach Datum gemischt). Deshalb wird hier keine Lücke behauptet.":
         "The issue numbers in this series are inconsistent (sequential and "
