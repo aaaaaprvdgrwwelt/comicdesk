@@ -365,6 +365,8 @@ EN = {
         "{shown} of {total} series shown · {checked} checked against a source",
     "{count} Hefte, {span}": "{count} issues, {span}",
     "{count} Hefte": "{count} issues",
+    "Anzeige auf {shown} von {found} begrenzt – Suche eingrenzen":
+        "Showing {shown} of {found} - narrow the search",
     "{series} Reihen und {hits} Ausgaben von {total} indizierten Comics":
         "{series} series and {hits} issues out of {total} indexed comics",
     "Die Heftnummern dieser Reihe sind uneinheitlich (etwa fortlaufend und "

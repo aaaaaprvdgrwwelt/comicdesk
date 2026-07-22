@@ -379,11 +379,12 @@ class CollectionIndex:
                 return entry.name
         return None
 
-    def search(self, text: str, limit: int = 2000,
-               collection: str | None = None) -> list[Path]:
+    def _build_query(self, text: str, collection: str | None
+                     ) -> tuple[str, list, bool]:
+        """(FROM/WHERE-Teil, Parameter, hat Treffer moeglich)."""
         query = parse_query(text)
         if query.is_empty:
-            return []
+            return "", [], False
         where: list[str] = []
         params: list = []
         if collection is not None:
@@ -400,18 +401,33 @@ class CollectionIndex:
             where.append("COALESCE(c.has_tags, 0) = ?")
             params.append(1 if query.tagged else 0)
 
-        sql = "SELECT c.path FROM comics c"
+        sql = " FROM comics c"
         if query.free_text:
             sql += " JOIN comics_fts f ON f.path = c.path"
             where.append("comics_fts MATCH ?")
             params.append(" AND ".join(_fts_term(t) for t in query.free_text))
         if where:
             sql += " WHERE " + " AND ".join(where)
-        sql += " ORDER BY c.series, c.issue_sort, c.name LIMIT ?"
-        params.append(limit)
+        return sql, params, True
 
-        rows = self._con().execute(sql, params).fetchall()
+    def search(self, text: str, limit: int = 2000,
+               collection: str | None = None) -> list[Path]:
+        body, params, ok = self._build_query(text, collection)
+        if not ok:
+            return []
+        rows = self._con().execute(
+            "SELECT c.path" + body +  # noqa: S608
+            " ORDER BY c.series, c.issue_sort, c.name LIMIT ?",
+            params + [limit]).fetchall()
         return [Path(r["path"]) for r in rows]
+
+    def count_matches(self, text: str, collection: str | None = None) -> int:
+        """Wie viele Treffer es wirklich gibt - die Anzeige ist begrenzt."""
+        body, params, ok = self._build_query(text, collection)
+        if not ok:
+            return 0
+        return self._con().execute(
+            "SELECT COUNT(*)" + body, params).fetchone()[0]  # noqa: S608
 
     def distinct(self, column: str, limit: int = 500) -> list[str]:
         """Fuer Vorschlaege - z.B. alle vorkommenden Verlage."""

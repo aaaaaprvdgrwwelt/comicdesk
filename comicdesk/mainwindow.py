@@ -57,6 +57,8 @@ SOURCE_COLORS = {
 
 SEARCH_PLACEHOLDER = "Sammlung durchsuchen – z. B. serie:batman jahr:1990-1999 joker"
 FILTER_PLACEHOLDER = "Filter (Dateiname) …"
+SEARCH_LIMIT = 2000
+
 SEARCH_FIELDS = ("serie: nummer: titel: jahr: verlag: genre: tag: figur: "
                 "team: ort: autor: sprache: quelle: getaggt:")
 
@@ -717,7 +719,9 @@ class MainWindow(QMainWindow):
                   "indizieren …“ ausfuehren."))
             return
         try:
-            hits = self.index.search(query, collection=collection)
+            hits = self.index.search(query, limit=SEARCH_LIMIT,
+                                     collection=collection)
+            total_hits = self.index.count_matches(query, collection)
         except Exception as exc:  # noqa: BLE001
             self.statusBar().showMessage(
                 _("Suche fehlgeschlagen: {error}").format(error=exc), 6000)
@@ -728,12 +732,17 @@ class MainWindow(QMainWindow):
                                dirs={str(f) for f in folders},
                                subtitles=subtitles)
         self.meta.clear()
-        message = _("{hits} Treffer von {total} indizierten Comics").format(
-            hits=len(hits), total=indexed)
         if folders:
             message = _("{series} Reihen und {hits} Ausgaben von {total} "
                         "indizierten Comics").format(
                 series=len(folders), hits=len(hits), total=indexed)
+        else:
+            message = _("{hits} Treffer von {total} indizierten Comics").format(
+                hits=len(hits), total=indexed)
+        if total_hits > len(hits):
+            message += "  ·  " + _("Anzeige auf {shown} von {found} begrenzt – "
+                                   "Suche eingrenzen").format(
+                shown=len(hits), found=total_hits)
         self.statusBar().showMessage(message)
 
     # ------------------------------------------------------------------
