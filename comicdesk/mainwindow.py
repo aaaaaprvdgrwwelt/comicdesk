@@ -30,6 +30,7 @@ from .matchdialog import MatchDialog
 from .metapanel import MetaPanel
 from .pageeditor import PageEditorDialog
 from .reader import ReaderWindow
+from .readstate import reading_state
 from .seriesdialog import SeriesDialog
 from .thumbs import ThumbLoader
 
@@ -987,8 +988,15 @@ class MainWindow(QMainWindow):
         win = ReaderWindow(path, self)
         win.setAttribute(Qt.WA_DeleteOnClose)
         win.closed.connect(lambda k: self.readers.pop(k, None))
+        win.retitled.connect(self._reader_retitled)
         self.readers[key] = win
         win.show()
+
+    def _reader_retitled(self, old: str, new: str) -> None:
+        """Der Reader ist auf das naechste Heft im Ordner gewechselt."""
+        window = self.readers.pop(old, None)
+        if window is not None:
+            self.readers[new] = window
 
     # --- Dateioperationen ---------------------------------------------
     def rename_selected(self) -> None:
@@ -1026,6 +1034,7 @@ class MainWindow(QMainWindow):
         else:
             self._deindex(old)
             self._reindex(new)
+            reading_state().rename(old, new)
         self.favorites.move_path(old, new)
         self.refresh_favorites()
         self.refresh_collections()

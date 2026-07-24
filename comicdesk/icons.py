@@ -41,6 +41,35 @@ PATHS = {
                 'stroke-dasharray="2.5 2"/>',
     "folder": '<path d="M3 7a1 1 0 0 1 1-1h5l2 2h8a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/>',
     "index": '<path d="M4 6h16M4 12h16M4 18h10"/><circle cx="18.5" cy="18" r="3"/>',
+    # --- Reader
+    "fit_page": '<rect x="5" y="3.5" width="14" height="17" rx="1"/>'
+                '<path d="M9 8l3-2.5L15 8M9 16l3 2.5 3-2.5"/>',
+    "fit_width": '<rect x="5" y="3.5" width="14" height="17" rx="1"/>'
+                 '<path d="M8 9L5.5 12 8 15M16 9l2.5 3-2.5 3"/>',
+    "fit_height": '<rect x="5" y="3.5" width="14" height="17" rx="1"/>'
+                  '<path d="M9 7l3-2.5L15 7M9 17l3 2.5 3-2.5"/>',
+    "zoom_in": '<circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/>'
+               '<path d="M10.5 8v5M8 10.5h5"/>',
+    "zoom_out": '<circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/>'
+                '<path d="M8 10.5h5"/>',
+    "double": '<rect x="2.5" y="4" width="8.5" height="16" rx="1"/>'
+              '<rect x="13" y="4" width="8.5" height="16" rx="1"/>',
+    "manga": '<rect x="2.5" y="4" width="8.5" height="16" rx="1"/>'
+             '<rect x="13" y="4" width="8.5" height="16" rx="1"/>'
+             '<path d="M11.8 12H6.5M8.6 9.8 6.3 12l2.3 2.2"/>',
+    "rotate": '<path d="M20 12a8 8 0 1 0-2.3 5.6"/><path d="M20 20v-4h-4"/>',
+    "lens": '<circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/>'
+            '<path d="M7.6 9a3.8 3.8 0 0 1 2.6-1.8"/>',
+    "thumbs": '<rect x="3.5" y="3.5" width="6" height="7" rx="1"/>'
+              '<rect x="3.5" y="13.5" width="6" height="7" rx="1"/>'
+              '<path d="M13 6h7M13 9.5h5M13 16h7M13 19.5h5"/>',
+    "bookmark": '<path d="M7 4h10v16l-5-4-5 4z"/>',
+    "fullscreen": '<path d="M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4'
+                  'M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4"/>',
+    "goto": '<path d="M12 3v14M7 12l5 5 5-5"/>'
+            '<path d="M4 21h16" stroke-dasharray="2 3"/>',
+    "pages": '<rect x="4" y="3.5" width="12" height="15" rx="1"/>'
+             '<path d="M8 21h11a1 1 0 0 0 1-1V8"/>',
 }
 
 _TEMPLATE = (
