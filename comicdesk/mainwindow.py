@@ -1301,10 +1301,11 @@ class MainWindow(QMainWindow):
     def choose_match(self) -> None:
         """Vorschlaege ansehen und selbst waehlen - fuer unsichere Faelle."""
         paths = [p for p in self.selected_paths() if p.is_file()]
-        if len(paths) != 1:
-            self.statusBar().showMessage(_("Bitte genau einen Eintrag waehlen."), 4000)
+        if not paths:
+            self.statusBar().showMessage(
+                _("Bitte mindestens eine Datei waehlen."), 4000)
             return
-        dialog = MatchDialog(paths[0], self.settings, self)
+        dialog = MatchDialog(paths, self.settings, self)
         dialog.applied.connect(self._on_match_applied)
         dialog.exec()
 

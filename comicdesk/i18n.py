@@ -51,6 +51,9 @@ DE = {
     "Ordner waehlen": "Ordner wählen",
     "GCD-SQLite-Dump waehlen": "GCD-SQLite-Dump wählen",
     "Bitte genau einen Eintrag waehlen.": "Bitte genau einen Eintrag wählen.",
+    "Bitte mindestens eine Datei waehlen.": "Bitte mindestens eine Datei wählen.",
+    "Diese Datei unveraendert lassen und mit der naechsten weitermachen.":
+        "Diese Datei unverändert lassen und mit der nächsten weitermachen.",
     "Bitte mindestens einen Ordner hinzufuegen.":
         "Bitte mindestens einen Ordner hinzufügen.",
     "Keine konvertierbaren Dateien gewaehlt.":
@@ -348,6 +351,12 @@ EN = {
     # --- Treffer waehlen
     "Treffer wählen …": "Choose match …",
     "Treffer wählen – {name}": "Choose match – {name}",
+    "Treffer wählen – {name} ({pos} von {count})":
+        "Choose match – {name} ({pos} of {count})",
+    "Überspringen": "Skip",
+    "Diese Datei unveraendert lassen und mit der naechsten weitermachen.":
+        "Leave this file unchanged and continue with the next one.",
+    "Bitte mindestens eine Datei waehlen.": "Please select at least one file.",
     "Die Begriffe stammen aus den Tags oder dem Dateinamen. Passt der Treffer "
     "nicht, liegt es meist daran – korrigieren und erneut suchen. Gibt es einen "
     "Serienname mehrfach, hilft der Bandtitel am ehesten weiter.":

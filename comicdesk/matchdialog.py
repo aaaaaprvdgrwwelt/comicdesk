@@ -3,9 +3,13 @@
 Zeigt alle Kandidaten samt Bewertung und Cover neben dem eigenen Heft. Die
 Suchbegriffe sind aenderbar: bei einem unsicheren Treffer liegt es meist am
 Dateinamen, aus dem sie stammen.
+
+Der Dialog nimmt auch mehrere Dateien: nach dem Uebernehmen geht es mit der
+naechsten weiter, statt fuer jedes Heft neu zu oeffnen.
 """
 from __future__ import annotations
 
+from collections.abc import Iterable
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QSize, Qt, QThread, Signal
@@ -87,9 +91,14 @@ class MatchDialog(QDialog):
 
     COLUMNS = ["", "Score", "Quelle", "Reihe", "Nr.", "Jahr", "Verlag"]
 
-    def __init__(self, path: Path, settings, parent=None):
+    def __init__(self, path: Path | Iterable[Path], settings, parent=None):
         super().__init__(parent)
-        self.path = Path(path)
+        if isinstance(path, (str, Path)):
+            self.paths = [Path(path)]
+        else:
+            self.paths = [Path(p) for p in path]
+        self.position = 0
+        self.path = self.paths[0]
         self.settings = settings
         self.candidates: list = []
         self.thread: QThread | None = None
@@ -97,7 +106,7 @@ class MatchDialog(QDialog):
         self.cover_thread: QThread | None = None
         self.cover_worker: _CoverWorker | None = None
 
-        self.setWindowTitle(_("Treffer wählen – {name}").format(name=self.path.name))
+        self._update_title()
         self.resize(1000, 700)
         root = QVBoxLayout(self)
 
@@ -164,6 +173,11 @@ class MatchDialog(QDialog):
             "ob es wirklich dasselbe Heft ist."))
         self.btn_open.setEnabled(False)
         self.btn_open.clicked.connect(self.open_in_browser)
+        self.btn_skip = QPushButton(_("Überspringen"))
+        self.btn_skip.setToolTip(_(
+            "Diese Datei unveraendert lassen und mit der naechsten "
+            "weitermachen."))
+        self.btn_skip.clicked.connect(self.skip)
         self.btn_apply = QPushButton(_("Übernehmen"))
         self.btn_apply.setDefault(True)
         self.btn_apply.setEnabled(False)
@@ -173,12 +187,47 @@ class MatchDialog(QDialog):
         knoepfe.addWidget(self.btn_search)
         knoepfe.addWidget(self.btn_open)
         knoepfe.addStretch(1)
+        knoepfe.addWidget(self.btn_skip)
         knoepfe.addWidget(self.btn_apply)
         knoepfe.addWidget(self.btn_close)
         root.addLayout(knoepfe)
+        # Bei einer einzelnen Datei gibt es nichts zum Ueberspringen.
+        self.btn_skip.setVisible(len(self.paths) > 1)
 
         self._load_file()
         self.search()
+
+    # --- Mehrere Dateien ----------------------------------------------
+    def _update_title(self) -> None:
+        if len(self.paths) > 1:
+            self.setWindowTitle(_("Treffer wählen – {name} ({pos} von {count})")
+                                .format(name=self.path.name,
+                                        pos=self.position + 1,
+                                        count=len(self.paths)))
+        else:
+            self.setWindowTitle(
+                _("Treffer wählen – {name}").format(name=self.path.name))
+
+    def _next_file(self) -> None:
+        """Zur naechsten Datei - oder schliessen, wenn keine mehr kommt."""
+        if self.position + 1 >= len(self.paths):
+            self.accept()
+            return
+        self._stop_all()
+        self.position += 1
+        self.path = self.paths[self.position]
+        self._update_title()
+        self.table.setRowCount(0)
+        self.candidates = []
+        self.details.clear()
+        self.btn_apply.setEnabled(False)
+        self.btn_open.setEnabled(False)
+        self.cover_label.clear()
+        self._load_file()
+        self.search()
+
+    def skip(self) -> None:
+        self._next_file()
 
     # ------------------------------------------------------------------
     def _load_file(self) -> None:
@@ -363,7 +412,7 @@ class MatchDialog(QDialog):
             self.status.setText("")
             return
         self.applied.emit(str(self.path))
-        self.accept()
+        self._next_file()
 
     # ------------------------------------------------------------------
     def _stop_all(self) -> None:
@@ -371,6 +420,12 @@ class MatchDialog(QDialog):
         stop_and_detach(self, self.cover_thread, self.cover_worker)
         self.thread = self.worker = None
         self.cover_thread = self.cover_worker = None
+
+    def accept(self) -> None:
+        # Nach der letzten Datei kann noch eine Suche laufen - closeEvent
+        # kommt bei accept() nicht, also hier selbst aufraeumen.
+        self._stop_all()
+        super().accept()
 
     def reject(self) -> None:
         self._stop_all()
