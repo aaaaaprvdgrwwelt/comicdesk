@@ -88,12 +88,16 @@ def _text_color() -> QColor:
     return app.palette().color(QPalette.WindowText)
 
 
-def icon(name: str, size: int = 24) -> QIcon:
-    """Icon `name` in Textfarbe. Unbekannte Namen ergeben ein leeres Icon."""
+def icon(name: str, size: int = 24, color: str | None = None) -> QIcon:
+    """Icon `name` in Textfarbe. Unbekannte Namen ergeben ein leeres Icon.
+
+    `color` erzwingt eine feste Farbe - fuer Flaechen, die nicht der Palette
+    folgen, etwa das dunkle Vollbild-HUD des Readers.
+    """
     body = PATHS.get(name)
     if not body:
         return QIcon()
-    color = _text_color()
+    color = QColor(color) if color else _text_color()
     key = (name, color.name(), size)
     if key in _cache:
         return _cache[key]

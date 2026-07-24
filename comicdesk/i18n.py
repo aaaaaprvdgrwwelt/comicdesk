@@ -600,6 +600,8 @@ EN = {
     "Lesezeichen auf Seite {page} gesetzt.": "Bookmark set on page {page}.",
     "Lesezeichen auf Seite {page} entfernt.": "Bookmark removed from page {page}.",
     "Keine Lesezeichen in diesem Heft.": "No bookmarks in this issue.",
+    "Ambientes Leuchten": "Ambient glow",
+    "Sanftes Umblättern": "Smooth page turns",
     "Dunkel": "Dark",
     "Schwarz": "Black",
     "Grau": "Grey",

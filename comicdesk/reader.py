@@ -16,17 +16,19 @@ import time
 from pathlib import Path
 
 from PySide6.QtCore import (
-    QObject, QPoint, QRect, QRunnable, QSettings, QSize, Qt, QThreadPool,
-    QTimer, Signal, Slot,
+    QEasingCurve, QObject, QPoint, QPropertyAnimation, QRect, QRectF,
+    QRunnable, QSettings, QSize, Qt, QThreadPool, QTimer, QVariantAnimation,
+    Signal, Slot,
 )
 from PySide6.QtGui import (
-    QAction, QActionGroup, QColor, QImage, QKeySequence, QPainter, QPen,
-    QPixmap, QTransform,
+    QAction, QActionGroup, QColor, QImage, QKeySequence, QLinearGradient,
+    QPainter, QPainterPath, QPen, QPixmap, QTransform,
 )
 from PySide6.QtWidgets import (
-    QDialog, QDialogButtonBox, QDockWidget, QInputDialog, QLabel,
-    QListWidget, QListWidgetItem, QMainWindow, QMessageBox, QScrollArea,
-    QSlider, QToolBar, QVBoxLayout, QWidget,
+    QDialog, QDialogButtonBox, QDockWidget, QGraphicsOpacityEffect,
+    QHBoxLayout, QInputDialog, QLabel, QListWidget, QListWidgetItem,
+    QMainWindow, QMessageBox, QScrollArea, QToolBar, QToolButton,
+    QVBoxLayout, QWidget,
 )
 
 from . import archive
@@ -110,11 +112,49 @@ class PageCache:
             del self._items[self._order.pop(0)]
 
 
+def ambient_of(pixmap: QPixmap) -> QImage:
+    """Winziges Abbild der Seite - Grundlage fuer Leuchten und Akzentfarbe.
+
+    16 Punkte Breite reichen: beim Hochskalieren verschwimmt das zu einem
+    weichen Farbverlauf, und genau der ist gewollt.
+    """
+    return pixmap.toImage().scaled(16, 16, Qt.IgnoreAspectRatio,
+                                   Qt.SmoothTransformation)
+
+
+def accent_of(small: QImage) -> QColor:
+    """Kraeftigste Farbe der Seite - sie faerbt das Fortschrittsband.
+
+    Gemittelt wird ueber die gesaettigten Bildpunkte; ein Schwarzweiss-Manga
+    hat keine, dann bleibt ein neutrales Blaugrau.
+    """
+    if small.isNull():
+        return QColor("#6a89a8")
+    summen = [0.0, 0.0, 0.0, 0.0]
+    for y in range(small.height()):
+        for x in range(small.width()):
+            farbe = QColor(small.pixel(x, y))
+            gewicht = farbe.saturationF() ** 2 * (0.25 + farbe.valueF())
+            summen[0] += farbe.redF() * gewicht
+            summen[1] += farbe.greenF() * gewicht
+            summen[2] += farbe.blueF() * gewicht
+            summen[3] += gewicht
+    if summen[3] < 0.5:
+        return QColor("#6a89a8")
+    farbe = QColor.fromRgbF(*(kanal / summen[3] for kanal in summen[:3]))
+    # Aufhellen, damit sie auch auf dunklem Grund traegt.
+    farbe = farbe.toHsv()
+    farbe.setHsv(farbe.hue(), min(230, farbe.saturation() + 40),
+                 max(170, farbe.value()))
+    return farbe
+
+
 # --- Anzeige -----------------------------------------------------------
 class _Canvas(QWidget):
-    """Malt die Seite, die Lupe und nimmt Maus-Eingaben entgegen."""
+    """Malt Leuchten, Seite, Schatten und Lupe, nimmt Maus-Eingaben entgegen."""
 
     clicked = Signal(float)     # 0..1: waagerechte Position des Klicks
+    moved = Signal()            # Mausbewegung - weckt das Vollbild-HUD
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -128,6 +168,15 @@ class _Canvas(QWidget):
         self._cursor = QPoint(-1, -1)
         self._drag_from: QPoint | None = None
         self._moved = False
+        #: Ambient-Leuchten: die Seite strahlt weich in den Hintergrund.
+        self.ambient = True
+        self._ambient_small = QImage()
+        self._ambient_cache = QPixmap()
+        self._ambient_for: tuple | None = None
+        #: Ueberblendung beim Umblaettern: 1.0 heisst fertig.
+        self.fade = 1.0
+        self.prev_pixmap = QPixmap()
+        self.prev_offset = QPoint(0, 0)
 
     # --- Zeichnen -----------------------------------------------------
     def offset(self) -> QPoint:
@@ -135,14 +184,54 @@ class _Canvas(QWidget):
         return QPoint(max(0, (self.width() - self.pixmap.width()) // 2),
                       max(0, (self.height() - self.pixmap.height()) // 2))
 
+    def set_ambient_source(self, small: QImage) -> None:
+        self._ambient_small = small
+        self._ambient_for = None
+
+    def _ambient_pixmap(self) -> QPixmap:
+        """Das kleine Abbild weich auf die volle Flaeche gezogen."""
+        marke = (self._ambient_small.cacheKey(),
+                 self.width(), self.height(), self.background.rgb())
+        if marke != self._ambient_for:
+            gross = self._ambient_small.scaled(
+                self.size(), Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
+            maler = QPainter(gross)
+            # Zur Hintergrundfarbe hin abdunkeln, damit die Seite selbst
+            # das hellste Element bleibt.
+            deckel = QColor(self.background)
+            deckel.setAlpha(150)
+            maler.fillRect(gross.rect(), deckel)
+            maler.end()
+            self._ambient_cache = QPixmap.fromImage(gross)
+            self._ambient_for = marke
+        return self._ambient_cache
+
     def paintEvent(self, event):  # noqa: N802
         painter = QPainter(self)
         painter.fillRect(self.rect(), self.background)
         if self.pixmap.isNull():
             return
-        painter.drawPixmap(self.offset(), self.pixmap)
+        if self.ambient and not self._ambient_small.isNull():
+            painter.drawPixmap(0, 0, self._ambient_pixmap())
+        ecke = self.offset()
+        if self.fade < 1.0 and not self.prev_pixmap.isNull():
+            painter.setOpacity(1.0 - self.fade)
+            painter.drawPixmap(self.prev_offset, self.prev_pixmap)
+            painter.setOpacity(self.fade)
+        self._paint_shadow(painter, QRect(ecke, self.pixmap.size()))
+        painter.drawPixmap(ecke, self.pixmap)
+        painter.setOpacity(1.0)
         if self.lens and self.rect().contains(self._cursor):
             self._paint_lens(painter)
+
+    def _paint_shadow(self, painter: QPainter, seite: QRect) -> None:
+        """Weicher Schattenrand, damit die Seite ueber dem Leuchten steht."""
+        painter.setPen(Qt.NoPen)
+        for abstand, alpha in ((6, 18), (4, 28), (2, 42)):
+            painter.setBrush(QColor(0, 0, 0, alpha))
+            painter.drawRoundedRect(
+                seite.adjusted(-abstand, -abstand + 2, abstand, abstand + 3),
+                abstand + 2, abstand + 2)
 
     def _paint_lens(self, painter: QPainter) -> None:
         if self.source.isNull() or not self.pixmap.width():
@@ -177,6 +266,7 @@ class _Canvas(QWidget):
 
     def mouseMoveEvent(self, event):  # noqa: N802
         pos = event.position().toPoint()
+        self.moved.emit()
         if self.lens:
             self._cursor = pos
             self.update()
@@ -212,6 +302,8 @@ class PageView(QScrollArea):
     flipped = Signal(bool)
     #: Rad mit Strg: zoomen. Richtung und Punkt unter dem Zeiger.
     zoomed = Signal(int, QPoint)
+    #: Groesse geaendert - die schwebenden Elemente muessen nachruecken.
+    resized = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -226,20 +318,43 @@ class PageView(QScrollArea):
         self.rotation = 0
         self._source = QPixmap()
         self._scaled_for: tuple | None = None
+        #: Sanftes Umblaettern - kurz genug, um nie zu bremsen.
+        self.fading = True
+        self._fade = QVariantAnimation(self)
+        self._fade.setDuration(160)
+        self._fade.setStartValue(0.0)
+        self._fade.setEndValue(1.0)
+        self._fade.setEasingCurve(QEasingCurve.OutCubic)
+        self._fade.valueChanged.connect(self._on_fade)
+
+    def _on_fade(self, wert: float) -> None:
+        self.canvas.fade = float(wert)
+        if self.canvas.fade >= 1.0:
+            self.canvas.prev_pixmap = QPixmap()
+        self.canvas.update()
 
     # ------------------------------------------------------------------
     def set_background(self, color: str) -> None:
         self.canvas.background = QColor(color)
         self.viewport().setStyleSheet(f"background:{color};")
+        self.canvas._ambient_for = None
         self.canvas.update()
 
     def set_page(self, pixmap: QPixmap, keep_position: bool = False) -> None:
+        vorher, ecke = self.canvas.pixmap, self.canvas.offset()
         self._source = pixmap
+        self.canvas.set_ambient_source(ambient_of(pixmap))
         self.rescale()
         if not keep_position:
             self.verticalScrollBar().setValue(0)
             self.horizontalScrollBar().setValue(
                 self.horizontalScrollBar().maximum() // 2)
+        if self.fading and not vorher.isNull():
+            self.canvas.prev_pixmap, self.canvas.prev_offset = vorher, ecke
+            self._fade.stop()
+            self._fade.start()
+        else:
+            self.canvas.fade = 1.0
 
     def set_fit(self, mode: int) -> None:
         self.fit_mode = mode
@@ -352,6 +467,208 @@ class PageView(QScrollArea):
     def resizeEvent(self, event):  # noqa: N802
         super().resizeEvent(event)
         self.rescale()
+        self.resized.emit()
+
+
+# --- Schwebende Elemente ----------------------------------------------
+class _Ribbon(QWidget):
+    """Fortschrittsband am unteren Rand der Seite.
+
+    Ein hauchduennes Leuchtband in der Akzentfarbe des Hefts; unter der Maus
+    waechst es an, zeigt Seitenzahlen und springt per Klick. Lesezeichen
+    sitzen als Rauten darauf. Ersetzt den nuechternen Schieberegler in der
+    Statusleiste, ohne Platz zu kosten.
+    """
+
+    jump = Signal(int)
+    SLIM, WIDE = 5, 22
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setMouseTracking(True)
+        self.setFixedHeight(self.SLIM)
+        self.total = 1
+        self.current = 0
+        self.bookmarks: list[int] = []
+        self.accent = QColor("#6a89a8")
+        self._hover_x: int | None = None
+        self._grow = QVariantAnimation(self)
+        self._grow.setDuration(140)
+        self._grow.setEasingCurve(QEasingCurve.OutCubic)
+        self._grow.valueChanged.connect(
+            lambda v: self.setFixedHeight(int(v)))
+
+    def set_data(self, current: int, total: int, bookmarks: list[int],
+                 accent: QColor) -> None:
+        self.total = max(1, total)
+        self.current = current
+        self.bookmarks = bookmarks
+        self.accent = accent
+        self.update()
+
+    def resizeEvent(self, event):  # noqa: N802
+        # Selbst am unteren Rand festhalten - auch waehrend das Band waechst.
+        eltern = self.parentWidget()
+        if eltern is not None:
+            self.setGeometry(0, eltern.height() - self.height(),
+                             eltern.width(), self.height())
+        super().resizeEvent(event)
+
+    # ------------------------------------------------------------------
+    def _page_at(self, x: int) -> int:
+        return min(self.total - 1, max(0, int(x * self.total / max(1, self.width()))))
+
+    def _animate_to(self, hoehe: int) -> None:
+        self._grow.stop()
+        self._grow.setStartValue(self.height())
+        self._grow.setEndValue(hoehe)
+        self._grow.start()
+
+    def enterEvent(self, event):  # noqa: N802
+        self._animate_to(self.WIDE)
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):  # noqa: N802
+        self._hover_x = None
+        self._animate_to(self.SLIM)
+        super().leaveEvent(event)
+
+    def mouseMoveEvent(self, event):  # noqa: N802
+        self._hover_x = int(event.position().x())
+        self.update()
+        super().mouseMoveEvent(event)
+
+    def mousePressEvent(self, event):  # noqa: N802
+        if event.button() == Qt.LeftButton:
+            self.jump.emit(self._page_at(int(event.position().x())))
+        super().mousePressEvent(event)
+
+    # ------------------------------------------------------------------
+    def paintEvent(self, event):  # noqa: N802
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        breit = self.height() > self.SLIM + 2
+        spur = QRectF(self.rect())
+        painter.fillRect(spur, QColor(0, 0, 0, 110 if breit else 60))
+        anteil = (self.current + 1) / self.total
+        voll = QRectF(0, 0, spur.width() * anteil, spur.height())
+        verlauf = QLinearGradient(0, 0, spur.width(), 0)
+        blass = QColor(self.accent)
+        blass.setAlpha(120)
+        verlauf.setColorAt(0.0, blass)
+        verlauf.setColorAt(max(0.0, anteil - 0.15), self.accent)
+        verlauf.setColorAt(anteil, self.accent.lighter(135))
+        painter.fillRect(voll, verlauf)
+        # Lesezeichen als Rauten - im schmalen Zustand als helle Striche.
+        for marke in self.bookmarks:
+            x = (marke + 0.5) / self.total * spur.width()
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(QColor(255, 214, 90))
+            if breit:
+                mitte = spur.height() / 2
+                pfad = QPainterPath()
+                pfad.moveTo(x, mitte - 5)
+                pfad.lineTo(x + 4, mitte)
+                pfad.lineTo(x, mitte + 5)
+                pfad.lineTo(x - 4, mitte)
+                pfad.closeSubpath()
+                painter.drawPath(pfad)
+            else:
+                painter.drawRect(QRectF(x - 1, 0, 2, spur.height()))
+        if breit and self._hover_x is not None:
+            seite = self._page_at(self._hover_x)
+            text = f"{seite + 1} / {self.total}"
+            painter.setPen(QColor(255, 255, 255, 230))
+            metrik = painter.fontMetrics()
+            w = metrik.horizontalAdvance(text) + 12
+            x = min(max(6, self._hover_x - w // 2), int(spur.width()) - w - 6)
+            painter.fillRect(QRect(x - 2, 0, w + 4, int(spur.height())),
+                             QColor(0, 0, 0, 130))
+            painter.drawText(QRect(x, 0, w, int(spur.height())),
+                             Qt.AlignCenter, text)
+            painter.setPen(QPen(QColor(255, 255, 255, 160), 1))
+            painter.drawLine(self._hover_x, 0, self._hover_x,
+                             int(spur.height()))
+
+
+class _Hud(QWidget):
+    """Schwebende Steuerpille fuers Vollbild.
+
+    Im Vollbild sind alle Leisten weg; die Pille taucht bei Mausbewegung
+    unten auf, blaettert und zeigt die Position, dann sinkt sie wieder weg.
+    """
+
+    def __init__(self, view: QWidget, window: "ReaderWindow"):
+        super().__init__(view)
+        self._window = window
+        self.setAttribute(Qt.WA_StyledBackground, True)
+        self.setStyleSheet(
+            "QWidget{background:rgba(24,24,28,215);border-radius:10px;}"
+            "QLabel{color:#f0f0f0;background:transparent;padding:0 10px;"
+            "font-size:13px;}"
+            "QToolButton{color:#f0f0f0;background:transparent;border:none;"
+            "padding:7px;}"
+            "QToolButton:hover{background:rgba(255,255,255,30);"
+            "border-radius:15px;}")
+        zeile = QHBoxLayout(self)
+        zeile.setContentsMargins(10, 4, 10, 4)
+        zurueck = QToolButton()
+        zurueck.setIcon(app_icon("left", color="#f0f0f0"))
+        zurueck.clicked.connect(window.prev_page)
+        zeile.addWidget(zurueck)
+        self.label = QLabel()
+        zeile.addWidget(self.label)
+        weiter = QToolButton()
+        weiter.setIcon(app_icon("right", color="#f0f0f0"))
+        weiter.clicked.connect(window.next_page)
+        zeile.addWidget(weiter)
+        self._effekt = QGraphicsOpacityEffect(self)
+        self._effekt.setOpacity(0.0)
+        self.setGraphicsEffect(self._effekt)
+        self._anim = QPropertyAnimation(self._effekt, b"opacity", self)
+        self._anim.setDuration(220)
+        self._weg = QTimer(self)
+        self._weg.setSingleShot(True)
+        self._weg.setInterval(1800)
+        self._weg.timeout.connect(lambda: self._fade_to(0.0))
+        self.hide()
+
+    def _fade_to(self, ziel: float) -> None:
+        self._anim.stop()
+        self._anim.setStartValue(self._effekt.opacity())
+        self._anim.setEndValue(ziel)
+        if ziel == 0.0:
+            self._anim.finished.connect(self._maybe_hide)
+        self._anim.start()
+
+    def _maybe_hide(self) -> None:
+        try:
+            self._anim.finished.disconnect(self._maybe_hide)
+        except RuntimeError:
+            pass
+        if self._effekt.opacity() < 0.05:
+            self.hide()
+
+    def poke(self, text: str) -> None:
+        """Zeigen (oder wachhalten) und den Countdown neu starten."""
+        self.label.setText(text)
+        self.adjustSize()
+        eltern = self.parentWidget()
+        if eltern is not None:
+            self.move((eltern.width() - self.width()) // 2,
+                      eltern.height() - self.height() - 36)
+        self.show()
+        self.raise_()
+        self._fade_to(1.0)
+        self._weg.start()
+
+    def enterEvent(self, event):  # noqa: N802
+        self._weg.stop()        # unter der Maus nicht wegsinken
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):  # noqa: N802
+        self._weg.start()
+        super().leaveEvent(event)
 
 
 # --- Fenster -----------------------------------------------------------
@@ -387,6 +704,13 @@ class ReaderWindow(QMainWindow):
             lambda vor: self.next_page() if vor else self.prev_page())
         self.view.zoomed.connect(self._on_wheel_zoom)
         self.setCentralWidget(self.view)
+
+        self.accent = QColor("#6a89a8")
+        self.ribbon = _Ribbon(self.view)
+        self.ribbon.jump.connect(self.go_to)
+        self.hud = _Hud(self.view, self)
+        self.view.resized.connect(self._place_overlays)
+        self.view.canvas.moved.connect(self._poke_hud)
 
         self._build_thumbs()
         self._build_actions()
@@ -546,6 +870,12 @@ class ReaderWindow(QMainWindow):
         m_ansicht.addAction(a_lens_more)
         m_ansicht.addAction(a_lens_less)
         m_ansicht.addSeparator()
+        self.a_ambient = self._act("Ambientes Leuchten", None,
+                                   self.toggle_ambient, True)
+        self.a_fade = self._act("Sanftes Umblättern", None,
+                                self.toggle_fade, True)
+        m_ansicht.addAction(self.a_ambient)
+        m_ansicht.addAction(self.a_fade)
         m_hintergrund = m_ansicht.addMenu(_("Hintergrund"))
         self.bg_group = QActionGroup(self)
         for name, farbe in BACKGROUNDS:
@@ -575,14 +905,22 @@ class ReaderWindow(QMainWindow):
             tb.addSeparator() if action is None else tb.addAction(action)
 
     def _build_status(self) -> None:
-        self.slider = QSlider(Qt.Horizontal)
-        self.slider.setMaximumWidth(320)
-        self.slider.setPageStep(1)
-        self.slider.setTracking(False)
-        self.slider.valueChanged.connect(self._on_slider)
+        # Den Seitenregler uebernimmt das Fortschrittsband auf der Seite.
         self.page_label = QLabel()
         self.statusBar().addPermanentWidget(self.page_label)
-        self.statusBar().addPermanentWidget(self.slider)
+
+    def _place_overlays(self) -> None:
+        self.ribbon.setGeometry(
+            0, self.view.height() - self.ribbon.height(),
+            self.view.width(), self.ribbon.height())
+        self.ribbon.raise_()
+        if self.hud.isVisible():
+            self.hud.move((self.view.width() - self.hud.width()) // 2,
+                          self.view.height() - self.hud.height() - 36)
+
+    def _poke_hud(self) -> None:
+        if self.isFullScreen():
+            self.hud.poke(self.page_label.text())
 
     def _restore_settings(self) -> None:
         s = self.settings
@@ -598,6 +936,10 @@ class ReaderWindow(QMainWindow):
         farbe = str(s.value("reader/background", BACKGROUNDS[0][1]))
         self.set_background(farbe)
         self.view.canvas.lens_zoom = float(s.value("reader/lens_zoom", 2.0))
+        self.view.canvas.ambient = s.value("reader/ambient", True, type=bool)
+        self.view.fading = s.value("reader/fade", True, type=bool)
+        self.a_ambient.setChecked(self.view.canvas.ambient)
+        self.a_fade.setChecked(self.view.fading)
         if s.value("reader/thumbs", False, type=bool):
             self.a_thumbs.setChecked(True)
             self.dock.show()
@@ -610,6 +952,8 @@ class ReaderWindow(QMainWindow):
         s.setValue("reader/manga", self.manga)
         s.setValue("reader/thumbs", self.dock.isVisible())
         s.setValue("reader/lens_zoom", self.view.canvas.lens_zoom)
+        s.setValue("reader/ambient", self.view.canvas.ambient)
+        s.setValue("reader/fade", self.view.fading)
 
     # --- Datei --------------------------------------------------------
     def _load(self, path: Path, first: bool = False) -> bool:
@@ -638,9 +982,6 @@ class ReaderWindow(QMainWindow):
         # Zoom und Drehung galten dem alten Heft, nicht dem neuen.
         self.view.zoom = 1.0
         self.view.rotation = 0
-        self.slider.blockSignals(True)
-        self.slider.setRange(1, comic.page_count)
-        self.slider.blockSignals(False)
         self._fill_thumb_list()
         return True
 
@@ -832,6 +1173,8 @@ class ReaderWindow(QMainWindow):
                 x += bild.width()
             maler.end()
         self.view.set_page(fertig)
+        self.accent = accent_of(self.view.canvas._ambient_small)
+        self._update_status()
 
     @Slot(int, str)
     def _on_fail(self, index: int, msg: str) -> None:
@@ -875,6 +1218,13 @@ class ReaderWindow(QMainWindow):
         self.manga = self.a_manga.isChecked()
         self.go_to(self.index)
 
+    def toggle_ambient(self) -> None:
+        self.view.canvas.ambient = self.a_ambient.isChecked()
+        self.view.canvas.update()
+
+    def toggle_fade(self) -> None:
+        self.view.fading = self.a_fade.isChecked()
+
     def toggle_lens(self) -> None:
         self.view.canvas.lens = self.a_lens.isChecked()
         self.view.canvas.setCursor(
@@ -900,6 +1250,7 @@ class ReaderWindow(QMainWindow):
             self.toolbar.hide()
             self.statusBar().hide()
             self.showFullScreen()
+            self.hud.poke(self.page_label.text())
         self.a_full.setChecked(self.isFullScreen())
 
     # --- Miniaturen ---------------------------------------------------
@@ -1001,18 +1352,12 @@ class ReaderWindow(QMainWindow):
         if self.manga:
             teile.append(_("Manga"))
         self.page_label.setText("  ·  ".join(teile))
-        self.slider.blockSignals(True)
-        self.slider.setValue(self.index + 1)
-        self.slider.blockSignals(False)
+        self.ribbon.set_data(self.index, gesamt, eintrag.bookmarks, self.accent)
         if self.dock.isVisible():
             self.thumbs.blockSignals(True)
             self.thumbs.setCurrentRow(self.index)
             self.thumbs.blockSignals(False)
             self._thumb_timer.start()
-
-    def _on_slider(self, wert: int) -> None:
-        if wert - 1 != self.index:
-            self.go_to(wert - 1)
 
     # --- Sonstiges ----------------------------------------------------
     def manage_pages(self) -> None:
