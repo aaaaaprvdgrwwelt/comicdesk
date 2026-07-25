@@ -558,6 +558,8 @@ class MainWindow(QMainWindow):
                              self.prune_favorites),
             "convert": act("Nach CBZ konvertieren", None, self.convert_selected,
                            on_view=True),
+            "recompress": act("Bilder konvertieren …", None,
+                              self.recompress_selected, on_view=True),
             "index": act("Sammlungen …", "Ctrl+Shift+M", self.edit_index, "index"),
             "settings": act("Einstellungen …", "Ctrl+,", self.open_settings,
                             "settings"),
@@ -606,7 +608,7 @@ class MainWindow(QMainWindow):
         menu.addAction(a["index"])
         menu.addSeparator()
         for key in ("autotag", "choose_match", "clear_tags", "rename_tpl",
-                    "pages", "convert"):
+                    "pages", "convert", "recompress"):
             menu.addAction(a[key])
         menu.addSeparator()
         for key in ("move_collection",):
@@ -1605,6 +1607,30 @@ class MainWindow(QMainWindow):
         if errors:
             QMessageBox.warning(self, _("Konvertieren"), "\n".join(errors))
         self.refresh()
+
+    def recompress_selected(self) -> None:
+        """Seitenbilder neu kodieren - WebP/AVIF sparen viel Platz."""
+        from .convertdialog import ConvertDialog
+
+        paths = [p for p in self.selected_paths()
+                 if p.is_file() and archive.is_comic(p)]
+        if not paths:
+            self.statusBar().showMessage(
+                _("Keine konvertierbaren Dateien gewaehlt."), 4000)
+            return
+        dialog = ConvertDialog(paths, self.settings, self)
+        dialog.converted.connect(self._on_recompressed)
+        dialog.exec()
+        self.refresh()
+
+    def _on_recompressed(self, path: str) -> None:
+        quelle = Path(path)
+        self.loader.forget(quelle)
+        # Die neue Datei liegt daneben oder an derselben Stelle - in beiden
+        # Faellen findet der Ordnerlauf sie beim Auffrischen.
+        for kandidat in (quelle, quelle.with_suffix(".cbz")):
+            if kandidat.exists():
+                self._reindex(kandidat)
 
     # ------------------------------------------------------------------
     def closeEvent(self, event):  # noqa: N802

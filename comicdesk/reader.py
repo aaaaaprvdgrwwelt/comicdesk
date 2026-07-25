@@ -35,6 +35,7 @@ from . import archive
 from .archive import ComicError, ComicFile, open_comic
 from .i18n import _
 from .icons import icon as app_icon
+from .imaging import load_image
 from .readstate import reading_state
 
 FIT_PAGE, FIT_WIDTH, FIT_HEIGHT, FIT_ORIGINAL = range(4)
@@ -70,9 +71,8 @@ class _PageJob(QRunnable):
 
     def run(self) -> None:
         try:
-            data = self.comic.page_bytes(self.index)
-            img = QImage()
-            if not img.loadFromData(data):
+            img = load_image(self.comic.page_bytes(self.index))
+            if img.isNull():
                 raise ComicError(_("Bild konnte nicht dekodiert werden."))
             if self.thumb:
                 self.signals.thumb.emit(self.index, img.scaled(

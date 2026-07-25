@@ -3,3 +3,4 @@ pymupdf
 comictagger
 send2trash
 requests
+pillow>=11.3

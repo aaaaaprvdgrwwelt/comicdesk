@@ -222,6 +222,66 @@ EN = {
     "Loeschen": "Delete",
     "Neuer Ordner": "New folder",
     "Nach CBZ konvertieren": "Convert to CBZ",
+
+    # --- Bilder umkodieren
+    "Bilder konvertieren …": "Convert images …",
+    "Bilder konvertieren": "Convert images",
+    "Schreibt die Seiten neu - als CBZ, mit den Tags. WebP und AVIF sind bei "
+    "gleichem Aussehen deutlich kleiner als alte JPEG-Scans. Seiten, die "
+    "schon im Zielformat vorliegen, bleiben unberührt.":
+        "Rewrites the pages as a CBZ, tags included. At the same visual "
+        "quality WebP and AVIF are much smaller than old JPEG scans. Pages "
+        "already in the target format are left alone.",
+    "Format": "Format",
+    "WebP": "WebP",
+    "AVIF": "AVIF",
+    "JPEG": "JPEG",
+    "PNG (verlustfrei)": "PNG (lossless)",
+    "Qualität": "Quality",
+    "sichtbar weicher": "visibly softer",
+    "guter Kompromiss": "good compromise",
+    "nah am Original": "close to the original",
+    "Verlustfrei": "Lossless",
+    "Nur bei Strichzeichnungen sinnvoll - Fotos und Rasterscans werden dabei "
+    "meist größer.":
+        "Only worthwhile for line art – photos and raster scans usually grow.",
+    "Größe begrenzen": "Limit size",
+    "unverändert": "unchanged",
+    "Begrenzt die längere Kante. 0 lässt die Auflösung, wie sie ist.":
+        "Limits the longer edge. 0 keeps the resolution as it is.",
+    "Nur übernehmen, wenn kleiner": "Only keep when smaller",
+    "Seiten, die durch das Umkodieren wachsen würden, bleiben im alten "
+    "Format.":
+        "Pages that would grow when re-encoded stay in their old format.",
+    "Originale": "Originals",
+    "Neue Datei daneben legen": "Put the new file alongside",
+    "Original ersetzen (in den Papierkorb)":
+        "Replace the original (move it to the trash)",
+    "Gleichzeitig": "In parallel",
+    "Probe rechnen": "Run a sample",
+    "Kodiert eine Seite aus der Mitte des ersten Hefts und zeigt, was das "
+    "bringt.":
+        "Encodes one page from the middle of the first issue and shows what "
+        "it gains.",
+    "Wird gerechnet …": "Calculating …",
+    "Probeseite: {old} → {new}  ({percent} %)":
+        "Sample page: {old} → {new}  ({percent} %)",
+    "Umkodieren": "Re-encode",
+    "Originale ersetzen": "Replace originals",
+    "{count} Datei(en) umkodieren und die Originale in den Papierkorb legen?":
+        "Re-encode {count} file(s) and move the originals to the trash?",
+    "Vorher": "Before",
+    "Nachher": "After",
+    "Ersparnis": "Saved",
+    "{percent} %": "{percent} %",
+    "{name} …": "{name} …",
+    "Nichts umkodiert.": "Nothing re-encoded.",
+    "Wird abgebrochen …": "Cancelling …",
+    "{files} Datei(en): {old} → {new}, {saved} gespart ({percent} %). "
+    "{kept} Seite(n) unverändert gelassen.":
+        "{files} file(s): {old} → {new}, {saved} saved ({percent} %). "
+        "{kept} page(s) left unchanged.",
+    "–": "–",
     "Sammlung indizieren …": "Index collection …",
     "Metadaten-Quellen …": "Metadata sources …",
     "Aktionen": "Actions",

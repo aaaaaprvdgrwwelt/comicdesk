@@ -8,6 +8,7 @@ from PySide6.QtCore import QObject, QRunnable, Qt, QThreadPool, Signal
 from PySide6.QtGui import QImage, QPixmap
 
 from . import archive
+from .imaging import load_image
 
 THUMB_SIZE = 256
 
@@ -53,8 +54,8 @@ class _Job(QRunnable):
         if img.isNull():
             data = archive.cover_bytes(self.path)
             if data:
-                raw = QImage()
-                if raw.loadFromData(data):
+                raw = load_image(data)
+                if not raw.isNull():
                     img = raw.scaled(
                         THUMB_SIZE, THUMB_SIZE,
                         Qt.KeepAspectRatio, Qt.SmoothTransformation,

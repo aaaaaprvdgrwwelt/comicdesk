@@ -99,6 +99,15 @@ class ComicFile:
         """Anzeigename der Seite - fuer die Seitenverwaltung."""
         return str(index + 1)
 
+    def page_name(self, index: int) -> str:
+        """Pfad der Seite im Archiv, mit Ordnern.
+
+        Ueber diesen Pfad entsteht die Seitenreihenfolge - wer ein Archiv
+        neu schreibt, muss ihn beibehalten, sonst rutscht etwa ein
+        `cover.jpg` aus einem Oberordner hinter die Seite 1.
+        """
+        return self.page_label(index)
+
     # --- Seiten bearbeiten --------------------------------------------
     @property
     def can_edit_pages(self) -> bool:
@@ -197,6 +206,9 @@ class ZipComic(ComicFile):
 
     def page_label(self, index: int) -> str:
         return Path(self._names[index]).name
+
+    def page_name(self, index: int) -> str:
+        return self._names[index]
 
     @property
     def can_edit_pages(self) -> bool:
@@ -332,6 +344,15 @@ class ExtractedComic(ComicFile):
     def page_bytes(self, index: int) -> bytes:
         self._ensure()
         return self._names[index].read_bytes()
+
+    def page_label(self, index: int) -> str:
+        self._ensure()
+        return self._names[index].name
+
+    def page_name(self, index: int) -> str:
+        self._ensure()
+        assert self._dir is not None
+        return str(self._names[index].relative_to(self._dir))
 
     def _read_cix(self) -> str | None:
         self._ensure()

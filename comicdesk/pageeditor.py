@@ -14,6 +14,7 @@ from .archive import ComicError, open_comic
 from .background import stop_and_detach
 from .i18n import _
 from .icons import icon as app_icon
+from .imaging import load_image
 
 THUMB = 150
 #: Der urspruengliche Seitenindex haengt am Listeneintrag.
@@ -47,8 +48,7 @@ class _ThumbWorker(QObject):
                 if self._stop:
                     break
                 try:
-                    image = QImage()
-                    image.loadFromData(comic.page_bytes(index))
+                    image = load_image(comic.page_bytes(index))
                     if not image.isNull():
                         self.ready.emit(
                             index,
