@@ -1620,6 +1620,8 @@ class MainWindow(QMainWindow):
             return
         dialog = ConvertDialog(paths, self.settings, self)
         dialog.converted.connect(self._on_recompressed)
+        # Das Signal traegt einen String, _deindex will einen Pfad.
+        dialog.removed.connect(lambda p: self._deindex(Path(p)))
         dialog.exec()
         self.refresh()
 

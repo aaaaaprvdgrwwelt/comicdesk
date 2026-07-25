@@ -18,11 +18,13 @@ from PySide6.QtWidgets import (
 from .background import stop_and_detach
 from .i18n import _
 from .recompress import (
-    Abort, Options, Result, available_formats, convert_archive, human, sample,
+    DEFAULT_PRESET, PRESETS, Abort, Options, Result, available_formats,
+    convert_archive, human, preset_for, preset_quality, sample,
 )
 
-#: Was mit der Ausgangsdatei geschieht.
-KEEP, REPLACE = range(2)
+#: Was mit der Ausgangsdatei geschieht. COMPARE legt sie wie KEEP daneben
+#: und oeffnet danach den Vergleich, in dem man sich entscheidet.
+KEEP, REPLACE, COMPARE = range(3)
 
 
 def _unique(path: Path) -> Path:
@@ -76,6 +78,8 @@ class _Worker(QObject):
                 if fehler:
                     self.file_done.emit(zeile, ergebnis, fehler)
                     continue
+            else:
+                ergebnis.dest = ziel
             gesamt.pages += ergebnis.pages
             gesamt.converted += ergebnis.converted
             gesamt.kept += ergebnis.kept
@@ -102,6 +106,8 @@ class ConvertDialog(QDialog):
 
     #: Fertige Dateien - das Hauptfenster indiziert sie nach.
     converted = Signal(str)
+    #: Beim Vergleich verworfene Dateien - die muessen aus dem Index.
+    removed = Signal(str)
 
     COLUMNS = ["Datei", "Seiten", "Vorher", "Nachher", "Ersparnis"]
 
@@ -111,6 +117,8 @@ class ConvertDialog(QDialog):
         self.settings = settings
         self.thread: QThread | None = None
         self.worker: _Worker | None = None
+        #: Zeile -> Result, fuer den Vergleich nach dem Lauf.
+        self.results: dict[int, Result] = {}
 
         self.setWindowTitle(_("Bilder konvertieren"))
         self.resize(760, 560)
@@ -129,18 +137,26 @@ class ConvertDialog(QDialog):
         self.format.currentIndexChanged.connect(self._on_format)
         form.addRow(_("Format"), self.format)
 
+        self.preset = QComboBox()
+        for stufe, name in enumerate(PRESETS):
+            self.preset.addItem(_(name), stufe)
+        self.preset.addItem(_("Eigener Wert"), -1)
+        self.preset.currentIndexChanged.connect(self._on_preset)
+        form.addRow(_("Qualität"), self.preset)
+
         self.quality = QSlider(Qt.Horizontal)
         self.quality.setRange(30, 100)
         self.quality.setTickInterval(10)
         self.quality.setTickPosition(QSlider.TicksBelow)
         self.quality_label = QLabel()
-        self.quality.valueChanged.connect(self._on_quality)
+        # Der Wert kaeme sonst als Argument an und landete in `from_preset`.
+        self.quality.valueChanged.connect(lambda _v: self._on_quality())
         zeile = QHBoxLayout()
         zeile.addWidget(self.quality, 1)
         zeile.addWidget(self.quality_label)
         rahmen = QWidget()
         rahmen.setLayout(zeile)
-        form.addRow(_("Qualität"), rahmen)
+        form.addRow("", rahmen)
 
         self.lossless = QCheckBox(_("Verlustfrei"))
         self.lossless.toggled.connect(self._on_lossless)
@@ -167,6 +183,7 @@ class ConvertDialog(QDialog):
         form.addRow("", self.smaller)
 
         self.mode = QComboBox()
+        self.mode.addItem(_("Danach vergleichen und entscheiden"), COMPARE)
         self.mode.addItem(_("Neue Datei daneben legen"), KEEP)
         self.mode.addItem(_("Original ersetzen (in den Papierkorb)"), REPLACE)
         form.addRow(_("Originale"), self.mode)
@@ -221,7 +238,10 @@ class ConvertDialog(QDialog):
         gemerkt = str(s.value("convert/format", "WEBP"))
         index = self.format.findData(gemerkt)
         self.format.setCurrentIndex(max(0, index))
-        self.quality.setValue(int(s.value("convert/quality", 80)))
+        self.quality.setValue(int(s.value(
+            "convert/quality",
+            preset_quality(self.format.currentData(), DEFAULT_PRESET))))
+        self._sync_preset()
         self.lossless.setChecked(s.value("convert/lossless", False, type=bool))
         self.max_edge.setValue(int(s.value("convert/max_edge", 0)))
         self.smaller.setChecked(s.value("convert/smaller", True, type=bool))
@@ -244,8 +264,32 @@ class ConvertDialog(QDialog):
             threads=self.threads.value(),
         )
 
+    def _on_preset(self) -> None:
+        """Stufe gewaehlt: den Regler auf den Wert dieses Formats stellen."""
+        stufe = self.preset.currentData()
+        if stufe is None or stufe < 0:
+            return
+        self.quality.blockSignals(True)
+        self.quality.setValue(preset_quality(self.format.currentData(), stufe))
+        self.quality.blockSignals(False)
+        self._on_quality(from_preset=True)
+
+    def _sync_preset(self) -> None:
+        """Reglerwert einer Stufe zuordnen - sonst steht dort 'Eigener Wert'."""
+        stufe = preset_for(self.format.currentData(), self.quality.value())
+        index = self.preset.findData(-1 if stufe is None else stufe)
+        self.preset.blockSignals(True)
+        self.preset.setCurrentIndex(max(0, index))
+        self.preset.blockSignals(False)
+
     def _on_format(self) -> None:
         spec = self.options().spec
+        # Dieselbe Stufe bedeutet je Format eine andere Zahl.
+        stufe = self.preset.currentData()
+        if stufe is not None and stufe >= 0:
+            self.quality.blockSignals(True)
+            self.quality.setValue(preset_quality(spec.key, stufe))
+            self.quality.blockSignals(False)
         self.lossless.setEnabled(spec.lossless and spec.key != "PNG")
         if not self.lossless.isEnabled():
             self.lossless.setChecked(False)
@@ -283,12 +327,13 @@ class ConvertDialog(QDialog):
         else:
             self.hint.clear()
 
-    def _on_quality(self) -> None:
+    def _on_quality(self, from_preset: bool = False) -> None:
+        if not from_preset:
+            self._sync_preset()
         wert = self.quality.value()
-        hinweis = (_("sichtbar weicher") if wert < 55
-                   else _("guter Kompromiss") if wert < 90 else _("nah am Original"))
-        self.quality_label.setText(
-            f"{wert}  ({hinweis})" if self.quality.isEnabled() else _("–"))
+        self.quality_label.setText(str(wert) if self.quality.isEnabled()
+                                   else _("–"))
+        self.sample_label.clear()
 
     # --- Probe --------------------------------------------------------
     def run_sample(self) -> None:
@@ -355,6 +400,8 @@ class ConvertDialog(QDialog):
             self.table.setItem(zeile, 1, QTableWidgetItem(_("Fehler")))
             self.table.setItem(zeile, 2, QTableWidgetItem(fehler))
             return
+        if ergebnis.dest is not None:
+            self.results[zeile] = ergebnis
         werte = [str(ergebnis.pages), human(ergebnis.old_file),
                  human(ergebnis.new_file),
                  fehler or _("{percent} %").format(percent=ergebnis.percent)]
@@ -375,6 +422,26 @@ class ConvertDialog(QDialog):
                 files=len(self.paths), old=human(gesamt.old_file),
                 new=human(gesamt.new_file), saved=human(gesamt.saved),
                 percent=gesamt.percent, kept=gesamt.kept))
+        if self.mode.currentData() == COMPARE and self.results:
+            self.compare()
+
+    def compare(self) -> None:
+        """Beide Fassungen nebeneinander legen und eine davon behalten."""
+        from .comparedialog import CompareDialog, Pair
+
+        paare = [Pair(self.paths[zeile], r.dest, r.old_file, r.new_file)
+                 for zeile, r in sorted(self.results.items())
+                 if r.dest is not None and r.dest.exists()]
+        if not paare:
+            return
+        dialog = CompareDialog(paare, self)
+        dialog.resolved.connect(self._on_resolved)
+        dialog.exec()
+        self.results.clear()
+
+    def _on_resolved(self, behalten: str, weg: str) -> None:
+        self.removed.emit(weg)
+        self.converted.emit(behalten)
 
     # ------------------------------------------------------------------
     def _stop_all(self) -> None:

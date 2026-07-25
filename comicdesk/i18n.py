@@ -252,9 +252,48 @@ EN = {
     "JPEG": "JPEG",
     "PNG (verlustfrei)": "PNG (lossless)",
     "Qualität": "Quality",
+    "Sehr gut": "Very good",
+    "Gut": "Good",
+    "Standard": "Standard",
+    "Klein": "Small",
+    "Eigener Wert": "Custom value",
     "sichtbar weicher": "visibly softer",
     "guter Kompromiss": "good compromise",
     "nah am Original": "close to the original",
+
+    # --- Fassungen vergleichen
+    "Danach vergleichen und entscheiden": "Compare afterwards and decide",
+    "Fassungen vergleichen": "Compare versions",
+    "Links das Original, rechts die neue Fassung – dieselbe Seite im selben "
+    "Ausschnitt. Bei 100 % zeigen sich Artefakte am ehesten in Flächen und an "
+    "Rasterpunkten. Was du behältst, bleibt liegen; die andere Fassung "
+    "wandert in den Papierkorb.":
+        "The original on the left, the new version on the right – same page, "
+        "same detail. At 100 % artefacts show up most readily in flat areas "
+        "and in halftone dots. Whatever you keep stays put; the other "
+        "version goes to the trash.",
+    "Original · {size}": "Original · {size}",
+    "Neu · {size} ({percent} %)": "New · {size} ({percent} %)",
+    "Seiten werden geladen …": "Loading pages …",
+    "Seite {page} nicht lesbar.": "Page {page} cannot be read.",
+    "Seite {page} / {total}": "Page {page} / {total}",
+    "Diese Seite: {old} → {new}  ·  {ow}×{oh} gegen {nw}×{nh}":
+        "This page: {old} → {new}  ·  {ow}×{oh} against {nw}×{nh}",
+    "Neue behalten, Original löschen": "Keep the new one, delete the original",
+    "Original behalten, neue löschen": "Keep the original, delete the new one",
+    "Offen lassen": "Leave open",
+    "neue behalten": "keep new",
+    "Original behalten": "keep original",
+    "Ausführen": "Carry out",
+    "Nichts entschieden.": "Nothing decided.",
+    "Fassungen aufräumen": "Tidy up versions",
+    "{count} Datei(en) in den Papierkorb legen?{rest}":
+        "Move {count} file(s) to the trash?{rest}",
+    "{open} Heft(e) bleiben unentschieden – dort passiert nichts.":
+        "{open} issue(s) stay undecided – nothing happens to them.",
+    "{count} Datei(en) in den Papierkorb gelegt.":
+        "{count} file(s) moved to the trash.",
+    "Entscheidung": "Decision",
     "Verlustfrei": "Lossless",
     "Nur bei Strichzeichnungen sinnvoll - Fotos und Rasterscans werden dabei "
     "meist größer.":

@@ -61,6 +61,31 @@ def available_formats() -> list[Format]:
     return [f for f in FORMATS.values() if f.key in Image.SAVE]
 
 
+#: Qualitaetsstufen. Die Zahlen bedeuten je Format etwas anderes - AVIF 55
+#: sieht aus wie WebP 78 -, deshalb steht hier je Format eine eigene Reihe.
+PRESETS = ("Sehr gut", "Gut", "Standard", "Klein")
+PRESET_VALUES = {
+    "WEBP": (93, 86, 78, 65),
+    "AVIF": (75, 63, 55, 43),
+    "JXL": (95, 88, 80, 68),
+    "JPEG": (94, 87, 80, 70),
+    "PNG": (100, 100, 100, 100),
+}
+#: Welche Stufe voreingestellt ist.
+DEFAULT_PRESET = 2
+
+
+def preset_quality(format_key: str, preset: int) -> int:
+    reihe = PRESET_VALUES.get(format_key, PRESET_VALUES["WEBP"])
+    return reihe[max(0, min(len(reihe) - 1, preset))]
+
+
+def preset_for(format_key: str, quality: int) -> int | None:
+    """Zu welcher Stufe gehoert dieser Wert? None heisst: eigener Wert."""
+    reihe = PRESET_VALUES.get(format_key, PRESET_VALUES["WEBP"])
+    return reihe.index(quality) if quality in reihe else None
+
+
 @dataclass
 class Options:
     format: str = "WEBP"
@@ -87,6 +112,8 @@ class Result:
     new_bytes: int = 0
     old_file: int = 0
     new_file: int = 0
+    #: Wo die neue Fassung liegt - fuer den anschliessenden Vergleich.
+    dest: Path | None = None
 
     @property
     def saved(self) -> int:
