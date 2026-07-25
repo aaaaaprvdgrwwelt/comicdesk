@@ -20,11 +20,12 @@ from comicapi.genericmetadata import GenericMetadata
 
 from . import archive
 from .favorites import Favorites
+from .smartlists import SmartLists
 from .icons import icon as app_icon
 from .i18n import _, set_language
 from .autotagdialog import AutoTagDialog, SettingsDialog
 from .dirtree import DirTreeModel
-from .index import CollectionIndex
+from .index import CollectionIndex, parse_query
 from .indexdialog import CollectionsDialog
 from .matchdialog import MatchDialog
 from .metapanel import MetaPanel
@@ -64,7 +65,8 @@ FILTER_PLACEHOLDER = "Filter (Dateiname) …"
 SEARCH_LIMIT = 2000
 
 SEARCH_FIELDS = ("serie: nummer: titel: jahr: verlag: genre: tag: figur: "
-                "team: ort: autor: sprache: quelle: getaggt:")
+                "team: ort: autor: sprache: quelle: getaggt: "
+                "sortiert:(reihe/neu/alt/jahr/name/gross/klein)")
 
 
 class CoverDelegate(QStyledItemDelegate):
@@ -362,6 +364,7 @@ class MainWindow(QMainWindow):
         self._meta_timer.setInterval(150)
         self._meta_timer.timeout.connect(self._load_metadata_now)
         self.favorites = Favorites()
+        self.smart_lists = SmartLists()
         self._build_ui()
         self._build_actions()
         self.set_directory(self.current_dir)
@@ -404,11 +407,34 @@ class MainWindow(QMainWindow):
         fav_layout.addWidget(self.fav_list, 1)
 
         fav_box.setMinimumHeight(90)
+
+        self.smart_list = QListWidget()
+        self.smart_list.setDragDropMode(QAbstractItemView.InternalMove)
+        self.smart_list.setDefaultDropAction(Qt.MoveAction)
+        self.smart_list.setContextMenuPolicy(Qt.ActionsContextMenu)
+        self.smart_list.itemClicked.connect(self._smart_clicked)
+        self.smart_list.itemActivated.connect(self._smart_clicked)
+        self.smart_list.model().rowsMoved.connect(
+            lambda *_a: self._save_smart_order())
+        smart_box = QWidget()
+        smart_layout = QVBoxLayout(smart_box)
+        smart_layout.setContentsMargins(0, 0, 0, 0)
+        smart_layout.setSpacing(2)
+        smart_header = QLabel(_("Intelligente Listen"))
+        smart_header.setStyleSheet("font-weight:600; padding:6px 4px 2px 4px;")
+        smart_header.setToolTip(_(
+            "Gespeicherte Suchen. Sie füllen sich selbst - was passt, steht "
+            "drin, ohne dass man etwas hineinzieht."))
+        smart_layout.addWidget(smart_header)
+        smart_layout.addWidget(self.smart_list, 1)
+        smart_box.setMinimumHeight(80)
+
         left = QSplitter(Qt.Vertical)
         left.addWidget(fav_box)
+        left.addWidget(smart_box)
         left.addWidget(self.tree)
-        left.setStretchFactor(1, 1)
-        left.setSizes([200, 600])
+        left.setStretchFactor(2, 1)
+        left.setSizes([160, 140, 500])
         self.left_splitter = left
 
         self.model = ComicListModel(self.loader, self)
@@ -495,6 +521,7 @@ class MainWindow(QMainWindow):
         if left_state:
             left.restoreState(left_state)
         self.splitter = split
+        self.refresh_smart_lists()
         self.refresh_favorites()
         self.refresh_collections()
         self.reload_tree_roots()
@@ -556,6 +583,13 @@ class MainWindow(QMainWindow):
             "fav_rename": act("Favorit umbenennen", None, self.rename_favorite),
             "fav_prune": act("Verschwundene Favoriten aufraeumen", None,
                              self.prune_favorites),
+            "smart_save": act("Suche als Liste speichern …", "Ctrl+Shift+L",
+                              self.save_smart_list, "search"),
+            "smart_edit": act("Abfrage bearbeiten …", None,
+                              self.edit_smart_list),
+            "smart_rename": act("Liste umbenennen", None,
+                                self.rename_smart_list),
+            "smart_remove": act("Liste entfernen", None, self.remove_smart_list),
             "convert": act("Nach CBZ konvertieren", None, self.convert_selected,
                            on_view=True),
             "recompress": act("Bilder konvertieren …", None,
@@ -590,6 +624,10 @@ class MainWindow(QMainWindow):
         menu.addAction(a["search"])
         menu.addAction(a["untagged"])
         menu.addAction(a["series"])
+        menu.addSeparator()
+        menu.addAction(a["smart_save"])
+        self.menu_smart = menu.addMenu(_("Intelligente Listen"))
+        self.menu_smart.aboutToShow.connect(self._fill_smart_menu)
         menu.addSeparator()
         self.action_folder_covers = QAction(_("Ordner mit Cover anzeigen"), self)
         self.action_folder_covers.setCheckable(True)
@@ -640,6 +678,8 @@ class MainWindow(QMainWindow):
 
         for key in ("fav_add", "fav_rename", "fav_remove", "fav_prune"):
             self.fav_list.addAction(a[key])
+        for key in ("smart_save", "smart_edit", "smart_rename", "smart_remove"):
+            self.smart_list.addAction(a[key])
 
         # --- Kontextmenue der Dateiansicht ----------------------------
         self.view.setContextMenuPolicy(Qt.ActionsContextMenu)
@@ -762,7 +802,13 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(
                 _("Suche fehlgeschlagen: {error}").format(error=exc), 6000)
             return
-        folders, entries, subtitles = _group_hits(hits)
+        # Wer eine Sortierung angibt, will diese Reihenfolge sehen. Die
+        # Reihen-Buendelung stellt aber die Ordner nach Trefferzahl nach
+        # vorn - bei "sortiert:neu" waere von "neu" nichts mehr uebrig.
+        if parse_query(query).explicit_sort:
+            folders, entries, subtitles = [], hits, {}
+        else:
+            folders, entries, subtitles = _group_hits(hits)
         self.model.set_entries(entries, show_parent=True,
                                status=self.index.status_for(hits),
                                dirs={str(f) for f in folders},
@@ -1442,6 +1488,149 @@ class MainWindow(QMainWindow):
         self.refresh()
 
     # --- Favoriten ----------------------------------------------------
+    # --- Intelligente Listen ------------------------------------------
+    def refresh_smart_lists(self) -> None:
+        self.smart_list.blockSignals(True)
+        self.smart_list.clear()
+        for eintrag in self.smart_lists.entries:
+            item = QListWidgetItem(eintrag.display)
+            item.setData(Qt.UserRole, eintrag.name)
+            item.setIcon(app_icon("search"))
+            hinweis = eintrag.query
+            if eintrag.collection:
+                hinweis += "\n" + _("nur in: {name}").format(
+                    name=eintrag.collection)
+            item.setToolTip(hinweis)
+            self.smart_list.addItem(item)
+        self.smart_list.blockSignals(False)
+
+    def _selected_smart(self):
+        item = self.smart_list.currentItem()
+        return self.smart_lists.get(item.data(Qt.UserRole)) if item else None
+
+    def _smart_clicked(self, item) -> None:
+        eintrag = self.smart_lists.get(item.data(Qt.UserRole))
+        if eintrag is None:
+            return
+        self.open_smart_list(eintrag)
+
+    def open_smart_list(self, eintrag) -> None:
+        """Liste anzeigen: Suchmodus an, Abfrage einsetzen, Sammlung setzen."""
+        if eintrag.collection:
+            index = self.collection_box.findText(eintrag.collection)
+            if index >= 0:
+                self.collection_box.setCurrentIndex(index)
+        self.search_toggle.setChecked(True)     # loest _toggle_search_mode aus
+        self.filter_edit.setText(eintrag.query)
+        self.refresh()
+
+    def save_smart_list(self) -> None:
+        """Die Suche, die gerade dasteht, unter einem Namen ablegen."""
+        if not self.search_mode:
+            self.statusBar().showMessage(
+                _("Erst suchen, dann die Suche als Liste speichern."), 5000)
+            return
+        query = self.filter_edit.text().strip()
+        if not query:
+            self.statusBar().showMessage(_("Die Suche ist leer."), 4000)
+            return
+        name, ok = QInputDialog.getText(
+            self, _("Als Liste speichern"), _("Name der Liste:"),
+            text=self._suggest_list_name(query))
+        name = name.strip()
+        if not ok or not name:
+            return
+        if self.smart_lists.get(name) is not None and QMessageBox.question(
+            self, _("Als Liste speichern"),
+            _("„{name}“ gibt es schon. Überschreiben?").format(name=name),
+        ) != QMessageBox.Yes:
+            return
+        self.smart_lists.add(name, query, self.active_collection or "")
+        self.refresh_smart_lists()
+        self.statusBar().showMessage(
+            _("Liste „{name}“ gespeichert.").format(name=name), 4000)
+
+    @staticmethod
+    def _suggest_list_name(query: str) -> str:
+        """Aus `serie:akim getaggt:nein` wird „Akim, ohne Tags“."""
+        from .index import BOOL_ALIASES, FIELD_ALIASES, SORT_ALIASES  # noqa: PLC0415
+
+        teile = []
+        for token in query.split():
+            key, sep, value = token.partition(":")
+            schluessel = key.casefold()
+            if not sep:
+                teile.append(token.strip('"'))
+            elif schluessel in BOOL_ALIASES:
+                teile.append(_("mit Tags") if value.casefold() in ("ja", "yes",
+                                                                  "true", "1")
+                             else _("ohne Tags"))
+            elif schluessel in SORT_ALIASES or schluessel not in FIELD_ALIASES:
+                continue
+            else:
+                teile.append(value.strip('"').capitalize())
+        return ", ".join(teile[:3])
+
+    def edit_smart_list(self) -> None:
+        eintrag = self._selected_smart()
+        if eintrag is None:
+            return
+        query, ok = QInputDialog.getText(
+            self, _("Abfrage bearbeiten"), _("Suche:"), text=eintrag.query)
+        if not ok or not query.strip():
+            return
+        eintrag.query = query.strip()
+        self.smart_lists.save()
+        self.refresh_smart_lists()
+        self.open_smart_list(eintrag)
+
+    def rename_smart_list(self) -> None:
+        eintrag = self._selected_smart()
+        if eintrag is None:
+            return
+        name, ok = QInputDialog.getText(
+            self, _("Liste umbenennen"), _("Neuer Name:"), text=eintrag.name)
+        name = name.strip()
+        if not ok or not name or name == eintrag.name:
+            return
+        if not self.smart_lists.rename(eintrag.name, name):
+            QMessageBox.warning(self, _("Liste umbenennen"),
+                                _("„{name}“ gibt es schon.").format(name=name))
+            return
+        self.refresh_smart_lists()
+
+    def remove_smart_list(self) -> None:
+        eintrag = self._selected_smart()
+        if eintrag is None:
+            return
+        if QMessageBox.question(
+            self, _("Liste entfernen"),
+            _("Liste „{name}“ entfernen? Die Comics bleiben, es "
+              "verschwindet nur die gespeicherte Suche.").format(
+                  name=eintrag.name),
+        ) != QMessageBox.Yes:
+            return
+        self.smart_lists.remove(eintrag.name)
+        self.refresh_smart_lists()
+
+    def _fill_smart_menu(self) -> None:
+        """Erst beim Aufklappen fuellen - die Listen aendern sich zur Laufzeit."""
+        self.menu_smart.clear()
+        if not self.smart_lists.entries:
+            leer = self.menu_smart.addAction(_("(noch keine)"))
+            leer.setEnabled(False)
+            return
+        for eintrag in self.smart_lists.entries:
+            action = self.menu_smart.addAction(eintrag.display)
+            action.setToolTip(eintrag.query)
+            action.triggered.connect(
+                lambda _c=False, e=eintrag: self.open_smart_list(e))
+
+    def _save_smart_order(self) -> None:
+        namen = [self.smart_list.item(i).data(Qt.UserRole)
+                 for i in range(self.smart_list.count())]
+        self.smart_lists.reorder(namen)
+
     def refresh_favorites(self) -> None:
         self.fav_list.blockSignals(True)
         self.fav_list.clear()

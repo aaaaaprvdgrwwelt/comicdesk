@@ -48,6 +48,7 @@ FIELD_ALIASES = {
 #: Sonderfelder, die keine Textsuche sind.
 BOOL_ALIASES = {"getaggt", "tagged"}
 TRUE_WORDS = {"ja", "yes", "true", "1"}
+SORT_ALIASES = {"sortiert", "sort", "sortierung"}
 
 TEXT_COLUMNS = [
     "series", "issue", "title", "publisher", "imprint", "genre", "language",
@@ -83,17 +84,37 @@ class Condition:
     value: str
 
 
+#: Sortierungen fuer `sortiert:`. Ohne Angabe gilt REIHE - danach sucht man
+#: in einer Comic-Sammlung am haeufigsten.
+SORTS = {
+    "reihe": "c.series, c.issue_sort, c.name",
+    "serie": "c.series, c.issue_sort, c.name",
+    "neu": "c.indexed_at DESC, c.name",
+    "alt": "c.indexed_at, c.name",
+    "jahr": "c.year DESC, c.series, c.issue_sort",
+    "name": "c.name",
+    "gross": "c.size DESC",
+    "klein": "c.size",
+}
+DEFAULT_SORT = SORTS["reihe"]
+
+
 @dataclass
 class ParsedQuery:
     fields: list[Condition]
     years: list[tuple[int, int]]
     free_text: list[str]
     tagged: bool | None = None
+    sort: str = DEFAULT_SORT
+    #: Wurde `sortiert:` angegeben? Dann ist die Abfrage auch ohne weitere
+    #: Bedingung sinnvoll: "alles, neueste zuerst" - begrenzt durch das
+    #: Limit der Anzeige. Genau das ist die Liste "Zuletzt indiziert".
+    explicit_sort: bool = False
 
     @property
     def is_empty(self) -> bool:
         return not (self.fields or self.years or self.free_text
-                    or self.tagged is not None)
+                    or self.tagged is not None or self.explicit_sort)
 
 
 def parse_query(text: str) -> ParsedQuery:
@@ -102,6 +123,7 @@ def parse_query(text: str) -> ParsedQuery:
     years: list[tuple[int, int]] = []
     free: list[str] = []
     tagged: bool | None = None
+    sort, explicit_sort = DEFAULT_SORT, False
     for raw in _token_re.findall(text or ""):
         token = raw.strip()
         if not token:
@@ -111,6 +133,9 @@ def parse_query(text: str) -> ParsedQuery:
         value = value.strip().strip('"')
         if sep and key_norm in BOOL_ALIASES and value:
             tagged = value.casefold() in TRUE_WORDS
+            continue
+        if sep and key_norm in SORT_ALIASES and value.casefold() in SORTS:
+            sort, explicit_sort = SORTS[value.casefold()], True
             continue
         column = FIELD_ALIASES.get(key_norm) if sep else None
         if column is None or not value:
@@ -122,7 +147,7 @@ def parse_query(text: str) -> ParsedQuery:
                 years.append(span)
             continue
         fields.append(Condition(column, value))
-    return ParsedQuery(fields, years, free, tagged)
+    return ParsedQuery(fields, years, free, tagged, sort, explicit_sort)
 
 
 def _year_span(value: str) -> tuple[int, int] | None:
@@ -407,11 +432,11 @@ class CollectionIndex:
         return None
 
     def _build_query(self, text: str, collection: str | None
-                     ) -> tuple[str, list, bool]:
-        """(FROM/WHERE-Teil, Parameter, hat Treffer moeglich)."""
+                     ) -> tuple[str, list, bool, str]:
+        """(FROM/WHERE-Teil, Parameter, hat Treffer moeglich, Sortierung)."""
         query = parse_query(text)
         if query.is_empty:
-            return "", [], False
+            return "", [], False, DEFAULT_SORT
         where: list[str] = []
         params: list = []
         if collection is not None:
@@ -435,22 +460,24 @@ class CollectionIndex:
             params.append(" AND ".join(_fts_term(t) for t in query.free_text))
         if where:
             sql += " WHERE " + " AND ".join(where)
-        return sql, params, True
+        return sql, params, True, query.sort
 
     def search(self, text: str, limit: int = 2000,
                collection: str | None = None) -> list[Path]:
-        body, params, ok = self._build_query(text, collection)
+        body, params, ok, sort = self._build_query(text, collection)
         if not ok:
             return []
+        # `sort` stammt aus SORTS, nie aus der Eingabe - sonst stuende hier
+        # eine Einladung, eigenes SQL unterzuschieben.
         rows = self._con().execute(
             "SELECT c.path" + body +  # noqa: S608
-            " ORDER BY c.series, c.issue_sort, c.name LIMIT ?",
+            f" ORDER BY {sort} LIMIT ?",
             params + [limit]).fetchall()
         return [Path(r["path"]) for r in rows]
 
     def count_matches(self, text: str, collection: str | None = None) -> int:
         """Wie viele Treffer es wirklich gibt - die Anzeige ist begrenzt."""
-        body, params, ok = self._build_query(text, collection)
+        body, params, ok, _sort = self._build_query(text, collection)
         if not ok:
             return 0
         return self._con().execute(

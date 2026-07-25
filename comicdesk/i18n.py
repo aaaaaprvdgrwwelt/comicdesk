@@ -534,6 +534,37 @@ EN = {
     "Sammlung loeschen": "Delete collection",
     "Name der Sammlung:": "Collection name:",
     "„{name}“ gibt es schon.": "“{name}” already exists.",
+
+    # --- Intelligente Listen
+    "Intelligente Listen": "Smart lists",
+    "Gespeicherte Suchen. Sie füllen sich selbst - was passt, steht drin, "
+    "ohne dass man etwas hineinzieht.":
+        "Saved searches. They fill themselves – whatever matches is in "
+        "there, without dragging anything in.",
+    "Suche als Liste speichern …": "Save search as a list …",
+    "Als Liste speichern": "Save as a list",
+    "Name der Liste:": "Name of the list:",
+    "Abfrage bearbeiten …": "Edit query …",
+    "Abfrage bearbeiten": "Edit query",
+    "Suche:": "Search:",
+    "Liste umbenennen": "Rename list",
+    "Liste entfernen": "Remove list",
+    "Liste „{name}“ gespeichert.": "List “{name}” saved.",
+    "Liste „{name}“ entfernen? Die Comics bleiben, es verschwindet nur die "
+    "gespeicherte Suche.":
+        "Remove the list “{name}”? The comics stay – only the saved search "
+        "goes away.",
+    "„{name}“ gibt es schon. Überschreiben?":
+        "“{name}” already exists. Overwrite?",
+    "Erst suchen, dann die Suche als Liste speichern.":
+        "Search first, then save that search as a list.",
+    "Die Suche ist leer.": "The search is empty.",
+    "nur in: {name}": "only in: {name}",
+    "(noch keine)": "(none yet)",
+    "mit Tags": "with tags",
+    "ohne Tags": "without tags",
+    "Ohne Tags": "Without tags",
+    "Zuletzt indiziert": "Recently indexed",
     "Sammlung „{name}“ mit {count} indizierten Comics loeschen?\n\n"
     "Die Comic-Dateien selbst bleiben unangetastet.":
         "Delete collection “{name}” with {count} indexed comics?\n\n"

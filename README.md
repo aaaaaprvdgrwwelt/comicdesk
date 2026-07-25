@@ -237,6 +237,7 @@ Suchsyntax — Feldsuchen und freier Text lassen sich mischen:
 | `getaggt:nein` | alles ohne Tags |
 | `quelle:comicvine` | woher die Tags stammen (`comicvine`, `gcd`, `manual`) |
 | `serie:batman jahr:2019 joker` | alles kombinierbar (UND) |
+| `sortiert:neu` | Reihenfolge festlegen (siehe unten) |
 
 Treffer erscheinen zweistufig: erst die **Reihen** (Ordner mit mindestens zwei
 Treffern) mit Cover und Heftzahl, darunter die einzelnen Ausgaben. Ein Klick
@@ -244,6 +245,40 @@ auf eine Reihe springt in den Ordner.
 
 Weitere Präfixe: `nummer:` `genre:` `sprache:` `imprint:` `arc:` `datei:`.
 Die englischen Namen (`series:` `year:` `publisher:` …) funktionieren ebenso.
+
+`sortiert:` kennt `reihe` (Standard), `neu`, `alt`, `jahr`, `name`, `gross`
+und `klein`. Mit einer Sortierung entfällt die Bündelung nach Reihen — sonst
+stünden die Ordner nach Trefferzahl vorn und von „neu" bliebe nichts übrig.
+`sortiert:neu` allein ist eine gültige Suche und bedeutet „alles, zuletzt
+Indiziertes zuerst".
+
+## Intelligente Listen
+
+Gespeicherte Suchen, die sich selbst pflegen — dasselbe Prinzip wie die Smart
+Lists von ComicRack, nur ohne Regel-Editor: eine Liste **ist** die Abfrage,
+die auch in der Suchleiste steht.
+
+Suche eintippen, dann *Ansicht → Suche als Liste speichern …* (`Strg+Umschalt+L`).
+Der Name wird aus der Abfrage vorgeschlagen (`serie:akim getaggt:nein` →
+„Akim, ohne Tags"). Die Liste erscheint links unter den Favoriten; ein Klick
+öffnet sie, per Ziehen lässt sich die Reihenfolge ändern. Über das
+Kontextmenü: Abfrage bearbeiten, umbenennen, entfernen.
+
+Ist beim Speichern eine Sammlung aktiv, merkt sich die Liste sie mit und
+schaltet beim Öffnen dorthin — im Tooltip steht dann „nur in: …".
+
+Mitgeliefert sind **Ohne Tags** (`getaggt:nein`) und **Zuletzt indiziert**
+(`sortiert:neu`). Sinnvolle eigene Listen sind etwa:
+
+| Liste | Abfrage |
+|---|---|
+| Aktuelle Baustelle | `serie:akim getaggt:nein` |
+| Fremdsprachiges | `sprache:en getaggt:ja` |
+| Große Dateien | `sortiert:gross` |
+| Ein Verlag, ein Jahrzehnt | `verlag:ehapa jahr:1970-1979` |
+
+Die Listen liegen als `~/.local/share/comicdesk/smartlists.json` — leicht zu
+sichern und weiterzugeben.
 
 ## Reihen: was fehlt mir?
 
