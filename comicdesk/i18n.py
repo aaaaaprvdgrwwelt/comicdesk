@@ -235,6 +235,20 @@ EN = {
     "Format": "Format",
     "WebP": "WebP",
     "AVIF": "AVIF",
+    "JPEG XL": "JPEG XL",
+    "Bei JPEG XL werden vorhandene JPEG-Seiten bit-genau umgepackt: kein "
+    "Verlust, trotzdem rund ein Fünftel kleiner.":
+        "With JPEG XL, existing JPEG pages are repacked bit for bit: no "
+        "loss, yet about a fifth smaller.",
+    "JPEG-Seiten werden bit-genau umgepackt – die Bildpunkte bleiben "
+    "identisch, die Datei wird trotzdem rund 20 % kleiner. Seiten, die kein "
+    "JPEG sind, werden verlustfrei neu kodiert und können dabei wachsen.":
+        "JPEG pages are repacked bit for bit – the pixels stay identical, "
+        "yet the file gets about 20 % smaller. Pages that are not JPEG are "
+        "re-encoded losslessly and may grow in the process.",
+    "Holt bei Scans am meisten heraus, braucht dafür aber rund eine halbe "
+    "Sekunde je Seite.":
+        "Gains the most on scans, but needs about half a second per page.",
     "JPEG": "JPEG",
     "PNG (verlustfrei)": "PNG (lossless)",
     "Qualität": "Quality",

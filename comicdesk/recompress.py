@@ -27,6 +27,11 @@ from .i18n import _
 # Image.SAVE, obwohl es einkompiliert ist.
 Image.init()
 
+try:                        # JPEG XL kommt nur mit Zusatzpaket
+    import pillow_jxl       # noqa: F401
+except ImportError:
+    pass
+
 
 @dataclass(frozen=True)
 class Format:
@@ -41,13 +46,18 @@ class Format:
 FORMATS = {
     "WEBP": Format("WEBP", ".webp", "WebP", True, True),
     "AVIF": Format("AVIF", ".avif", "AVIF", True, False),
+    "JXL": Format("JXL", ".jxl", "JPEG XL", True, True),
     "JPEG": Format("JPEG", ".jpg", "JPEG", False, False),
     "PNG": Format("PNG", ".png", "PNG (verlustfrei)", True, True),
 }
 
 
 def available_formats() -> list[Format]:
-    """Nur, was diese Pillow-Fassung auch schreiben kann."""
+    """Nur, was diese Pillow-Fassung auch schreiben kann.
+
+    JPEG XL faellt weg, wenn `pillow-jxl-plugin` fehlt - es ist nicht
+    ueberall als fertiges Paket zu haben.
+    """
     return [f for f in FORMATS.values() if f.key in Image.SAVE]
 
 
@@ -102,8 +112,30 @@ def _save_args(options: Options) -> dict:
         # speed 6 ist der uebliche Kompromiss; darunter dauert eine Seite
         # mehrere Sekunden, ohne nennenswert kleiner zu werden.
         return {"quality": options.quality, "speed": 6}
+    if spec.key == "JXL":
+        if options.lossless:
+            return {"lossless": True}
+        return {"quality": options.quality, "effort": 7}
     return {"quality": options.quality, "optimize": True,
             "progressive": True}
+
+
+def _repack_jpeg(data: bytes, bild: Image.Image) -> bytes | None:
+    """JPEG bit-genau als JPEG XL verpacken.
+
+    JPEG XL kann ein JPEG verlustfrei umpacken: die Bildpunkte bleiben
+    identisch, die Datei wird rund ein Fuenftel kleiner. Fuer Sammlungen aus
+    JPEG-Scans der beste Handel, den es gibt - es geht nichts verloren.
+    """
+    try:
+        from pillow_jxl import Encoder
+
+        encoder = Encoder(mode=bild.mode, lossless=True, quality=100,
+                          effort=7, num_threads=1, decoding_speed=0,
+                          use_container=True, use_original_profile=True)
+        return bytes(encoder(data, bild.width, bild.height, jpeg_encode=True))
+    except Exception:  # noqa: BLE001
+        return None
 
 
 def encode(data: bytes, options: Options) -> bytes | None:
@@ -115,6 +147,11 @@ def encode(data: bytes, options: Options) -> bytes | None:
         skalieren = bool(options.max_edge) and max(breite, hoehe) > options.max_edge
         if bild.format == spec.key and not skalieren and not options.lossless:
             return None         # schon im Zielformat - nicht neu kodieren
+        if (spec.key == "JXL" and options.lossless and not skalieren
+                and bild.format == "JPEG"):
+            gepackt = _repack_jpeg(data, bild)
+            if gepackt is not None:
+                return gepackt if len(gepackt) < len(data) else None
         if skalieren:
             faktor = options.max_edge / max(breite, hoehe)
             bild = bild.resize((max(1, round(breite * faktor)),

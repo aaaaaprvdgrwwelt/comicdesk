@@ -1,8 +1,8 @@
 """Bilddaten laden - auch Formate, die Qt nicht kennt.
 
 Qt liest JPEG, PNG, GIF und WebP, aber kein AVIF und kein JPEG XL. Genau
-die tauchen in neueren Sammlungen auf (und der eigene Konverter schreibt
-AVIF), deshalb springt fuer unbekannte Daten Pillow ein.
+die tauchen in neueren Sammlungen auf, und der eigene Konverter schreibt
+beide - deshalb springt fuer unbekannte Daten Pillow ein.
 """
 from __future__ import annotations
 
@@ -31,6 +31,10 @@ def _load_with_pillow(data: bytes) -> QImage:
         from PIL import Image
 
         Image.init()
+        try:                    # JPEG XL nur mit Zusatzpaket
+            import pillow_jxl   # noqa: F401
+        except ImportError:
+            pass
         with Image.open(io.BytesIO(data)) as bild:
             bild.load()
             if bild.mode not in _QT_FORMATS:

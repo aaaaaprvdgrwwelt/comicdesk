@@ -57,8 +57,10 @@ class _Worker(QObject):
             if self._stop:
                 break
             self.file_started.emit(zeile, pfad.name)
+            # Der Formatname im Dateinamen ist der Kuerzel, nicht das Label -
+            # "JPEG XL" waere hier sonst als "JPEG" zu lesen.
             ziel = _unique(pfad.with_name(
-                f"{pfad.stem} [{self.options.spec.label.split()[0]}].cbz"))
+                f"{pfad.stem} [{self.options.spec.key}].cbz"))
             try:
                 ergebnis = convert_archive(
                     pfad, ziel, self.options,
@@ -141,11 +143,12 @@ class ConvertDialog(QDialog):
         form.addRow(_("Qualität"), rahmen)
 
         self.lossless = QCheckBox(_("Verlustfrei"))
-        self.lossless.setToolTip(_(
-            "Nur bei Strichzeichnungen sinnvoll - Fotos und Rasterscans "
-            "werden dabei meist größer."))
         self.lossless.toggled.connect(self._on_lossless)
         form.addRow("", self.lossless)
+        self.hint = QLabel()
+        self.hint.setWordWrap(True)
+        self.hint.setStyleSheet("color:gray;")
+        form.addRow("", self.hint)
 
         self.max_edge = QSpinBox()
         self.max_edge.setRange(0, 8000)
@@ -246,16 +249,39 @@ class ConvertDialog(QDialog):
         self.lossless.setEnabled(spec.lossless and spec.key != "PNG")
         if not self.lossless.isEnabled():
             self.lossless.setChecked(False)
+        self.lossless.setToolTip(_(
+            "Bei JPEG XL werden vorhandene JPEG-Seiten bit-genau umgepackt: "
+            "kein Verlust, trotzdem rund ein Fünftel kleiner.")
+            if spec.key == "JXL" else _(
+            "Nur bei Strichzeichnungen sinnvoll - Fotos und Rasterscans "
+            "werden dabei meist größer."))
         # PNG ist immer verlustfrei, die Qualitaet waere ohne Wirkung.
         verlustbehaftet = spec.key != "PNG" and not self.lossless.isChecked()
         self.quality.setEnabled(verlustbehaftet)
         self._on_quality()
+        self._update_hint()
         self.sample_label.clear()
 
     def _on_lossless(self) -> None:
         self.quality.setEnabled(not self.lossless.isChecked()
                                 and self.options().spec.key != "PNG")
+        self._update_hint()
         self.sample_label.clear()
+
+    def _update_hint(self) -> None:
+        spec = self.options().spec
+        if spec.key == "JXL" and self.lossless.isChecked():
+            self.hint.setText(_(
+                "JPEG-Seiten werden bit-genau umgepackt – die Bildpunkte "
+                "bleiben identisch, die Datei wird trotzdem rund 20 % "
+                "kleiner. Seiten, die kein JPEG sind, werden verlustfrei neu "
+                "kodiert und können dabei wachsen."))
+        elif spec.key == "AVIF":
+            self.hint.setText(_(
+                "Holt bei Scans am meisten heraus, braucht dafür aber rund "
+                "eine halbe Sekunde je Seite."))
+        else:
+            self.hint.clear()
 
     def _on_quality(self) -> None:
         wert = self.quality.value()

@@ -4,3 +4,5 @@ comictagger
 send2trash
 requests
 pillow>=11.3
+# Optional: schaltet JPEG XL im Bildkonverter frei.
+pillow-jxl-plugin>=1.3
