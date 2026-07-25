@@ -60,6 +60,11 @@ SOURCE_COLORS = {
     "unknown": QColor(185, 185, 185),
 }
 
+#: Der Schluessel traegt die Zahl der Felder in der linken Spalte. Aendert
+#: sich der Aufbau, passt ein alter gespeicherter Zustand nicht mehr - und
+#: Qt gibt einem neu hinzugekommenen Feld dann die Hoehe 0.
+LEFT_SPLITTER_KEY = "left_splitter3"
+
 SEARCH_PLACEHOLDER = "Sammlung durchsuchen – z. B. serie:batman jahr:1990-1999 joker"
 FILTER_PLACEHOLDER = "Filter (Dateiname) …"
 SEARCH_LIMIT = 2000
@@ -435,6 +440,9 @@ class MainWindow(QMainWindow):
         left.addWidget(self.tree)
         left.setStretchFactor(2, 1)
         left.setSizes([160, 140, 500])
+        # Der Ordnerbaum darf nicht ganz zuklappen - er ist der Hauptweg
+        # durch die Sammlung, und zugeklappt findet man ihn nicht wieder.
+        left.setCollapsible(2, False)
         self.left_splitter = left
 
         self.model = ComicListModel(self.loader, self)
@@ -517,9 +525,15 @@ class MainWindow(QMainWindow):
         state = self.settings.value("splitter")
         if state:
             split.restoreState(state)
-        left_state = self.settings.value("left_splitter")
+        # Eigener Schluessel je Aufbau der linken Spalte: ein Zustand aus
+        # der Zeit vor den intelligenten Listen hatte nur zwei Groessen -
+        # Qt gab dem dritten Feld daraufhin die Hoehe 0, und der Ordnerbaum
+        # war verschwunden.
+        left_state = self.settings.value(LEFT_SPLITTER_KEY)
         if left_state:
             left.restoreState(left_state)
+        if left.sizes()[-1] < 40:
+            left.setSizes([160, 140, 500])
         self.splitter = split
         self.refresh_smart_lists()
         self.refresh_favorites()
@@ -1848,7 +1862,8 @@ class MainWindow(QMainWindow):
     def _store_session(self) -> None:
         """Sofort auf Platte schreiben - ein Absturz soll nichts kosten."""
         self.settings.setValue("splitter", self.splitter.saveState())
-        self.settings.setValue("left_splitter", self.left_splitter.saveState())
+        self.settings.setValue(LEFT_SPLITTER_KEY,
+                               self.left_splitter.saveState())
         self.settings.setValue("geometry", self.saveGeometry())
         self.settings.setValue("last_dir", str(self.current_dir))
         self.settings.sync()
