@@ -11,6 +11,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tarfile
 import tempfile
 import zipfile
@@ -39,6 +40,18 @@ def is_comic(path: Path) -> bool:
 
 
 def sevenzip_binary() -> str | None:
+    """Pfad zu 7z, oder None.
+
+    In den fertigen Paketen fuer Windows und macOS liegt 7z neben dem
+    Programm - dort ist nichts installiert, worauf man sich verlassen
+    koennte. Auf dem eigenen Rechner gilt weiter der Suchpfad.
+    """
+    mitgeliefert = getattr(sys, "_MEIPASS", None)
+    if mitgeliefert:
+        for name in ("7z.exe", "7za.exe", "7zz", "7za", "7z"):
+            kandidat = Path(mitgeliefert) / "bin" / name
+            if kandidat.is_file():
+                return str(kandidat)
     for name in ("7z", "7zz", "7za"):
         found = shutil.which(name)
         if found:

@@ -16,6 +16,24 @@ ComicVine oder einen lokalen Dump der Grand Comics Database.
 
 ## Installation
 
+### Fertige Pakete (Windows, macOS)
+
+Unter [Releases](https://github.com/aaaaaprvdgrwwelt/comicdesk/releases)
+liegen ein Windows-Installer und je ein DMG für Apple Silicon und Intel.
+Python muss dafür nicht installiert sein.
+
+Beide sind **nicht signiert** — ein Zertifikat kostet mehr, als ein
+kostenloses Projekt ausgeben mag. Deshalb einmalig:
+
+* **Windows:** „Der Computer wurde geschützt“ → *Weitere Informationen* →
+  *Trotzdem ausführen*.
+* **macOS:** beim ersten Start *Rechtsklick auf ComicDesk → Öffnen*, dann
+  im Dialog *Öffnen*. Ein Doppelklick allein wird abgelehnt.
+
+Wie die Pakete entstehen, steht in [packaging/](packaging/README.md).
+
+### Aus dem Quelltext (Linux und alle anderen)
+
 Voraussetzung ist Python 3.10 oder neuer.
 
 ```bash

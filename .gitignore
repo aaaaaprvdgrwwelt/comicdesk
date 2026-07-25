@@ -9,6 +9,15 @@ __pycache__/
 build/
 dist/
 
+# Beim Paketbau erzeugt - Symbole entstehen aus den SVGs, 7z wird
+# heruntergeladen.
+packaging/comicdesk.ico
+packaging/comicdesk.icns
+packaging/comicdesk.iconset/
+packaging/ico-teile/
+packaging/bin/
+selftest.log
+
 # Editoren
 .idea/
 .vscode/

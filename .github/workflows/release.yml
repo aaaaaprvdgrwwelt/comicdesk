@@ -1,0 +1,193 @@
+name: Pakete bauen
+
+# PyInstaller ist kein Cross-Compiler: ein Windows-Programm muss auf
+# Windows entstehen, ein Mac-Programm auf einem Mac. GitHub stellt beide.
+#
+# Ausgeloest von einem Tag wie v0.2.0 - dann entsteht auch ein Release.
+# Von Hand ueber "Actions -> Pakete bauen -> Run workflow" bekommt man
+# dieselben Dateien als Artefakt, ohne etwas zu veroeffentlichen.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write        # noetig, um das Release anzulegen
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: Windows
+          - os: macos-latest       # Apple Silicon
+            name: macOS (Apple Silicon)
+            arch: arm64
+          - os: macos-13           # Intel
+            name: macOS (Intel)
+            arch: x86_64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Version bestimmen
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_ENV"
+          else
+            echo "VERSION=0.0.0-$(date +%Y%m%d)" >> "$GITHUB_ENV"
+          fi
+
+      - name: Abhaengigkeiten
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: 7z mitnehmen (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          # CBR und CB7 gehen ueber 7z. Auf einem fremden Rechner ist nichts
+          # installiert, worauf man sich verlassen koennte - also mitliefern.
+          # Die volle Fassung kann auch RAR und liegt auf dem Runner bereit;
+          # nur falls nicht, kommt das eigenstaendige 7zr.exe zum Zug, das
+          # zwar 7z liest, aber kein RAR.
+          New-Item -ItemType Directory -Force packaging\bin | Out-Null
+          $voll = "C:\Program Files\7-Zip\7z.exe"
+          if (Test-Path $voll) {
+            Copy-Item $voll packaging\bin\7z.exe -Force
+            Copy-Item "C:\Program Files\7-Zip\7z.dll" packaging\bin\ -Force
+          } else {
+            Write-Host "7-Zip nicht gefunden, lade 7zr.exe (kein RAR)"
+            Invoke-WebRequest -Uri "https://www.7-zip.org/a/7zr.exe" `
+              -OutFile packaging\bin\7z.exe
+          }
+          Get-ChildItem packaging\bin
+
+      - name: 7z mitnehmen (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install sevenzip
+          mkdir -p packaging/bin
+          cp "$(brew --prefix sevenzip)/bin/7zz" packaging/bin/7zz
+
+      - name: Symbole erzeugen
+        shell: bash
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python packaging/make_icons.py packaging
+
+      - name: .icns bauen (macOS)
+        if: runner.os == 'macOS'
+        run: iconutil -c icns packaging/comicdesk.iconset -o packaging/comicdesk.icns
+
+      - name: PyInstaller
+        shell: bash
+        run: pyinstaller packaging/comicdesk.spec --noconfirm --clean
+
+      # --- Windows: Installer ---------------------------------------
+      - name: Inno Setup
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          # Auf windows-latest ist Inno Setup vorinstalliert; falls nicht,
+          # ueber Chocolatey nachholen.
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup -y --no-progress
+          }
+          & $iscc "/DVersion=$env:VERSION" packaging\comicdesk.iss
+
+      - name: ZIP ohne Installer (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Compress-Archive -Path dist\ComicDesk\* `
+            -DestinationPath "dist\ComicDesk-$env:VERSION-Windows.zip"
+
+      # --- macOS: DMG -----------------------------------------------
+      - name: DMG bauen
+        if: runner.os == 'macOS'
+        run: |
+          # Ad-hoc signieren. Das ersetzt kein Entwicklerzertifikat, sorgt
+          # aber dafuer, dass macOS die App ueberhaupt startet, statt sie
+          # als beschaedigt abzulehnen - besonders auf Apple Silicon, wo
+          # eine Signatur Pflicht ist.
+          codesign --force --deep --sign - dist/ComicDesk.app
+          brew install create-dmg
+          create-dmg \
+            --volname "ComicDesk" \
+            --icon "ComicDesk.app" 170 190 \
+            --app-drop-link 430 190 \
+            --window-size 600 380 \
+            --hide-extension "ComicDesk.app" \
+            "dist/ComicDesk-${VERSION}-macOS-${{ matrix.arch }}.dmg" \
+            "dist/ComicDesk.app" || \
+          hdiutil create -volname ComicDesk -srcfolder dist/ComicDesk.app \
+            -ov -format UDZO \
+            "dist/ComicDesk-${VERSION}-macOS-${{ matrix.arch }}.dmg"
+
+      - name: Selbsttest des fertigen Pakets
+        shell: bash
+        run: |
+          # Faellt hier auf, was sonst erst beim Nutzer auffiele: fehlende
+          # Bibliotheken, fehlendes 7z, kein PDF. Der Rueckgabewert zaehlt.
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            ./dist/ComicDesk/ComicDesk.exe --selftest; ergebnis=$?
+          else
+            ./dist/ComicDesk.app/Contents/MacOS/ComicDesk --selftest; ergebnis=$?
+          fi
+          # Ohne Konsolenfenster schreibt das Programm nur in die Datei.
+          cat selftest.log || true
+          exit $ergebnis
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ComicDesk-${{ matrix.name }}
+          path: |
+            dist/*.exe
+            dist/*.zip
+            dist/*.dmg
+          if-no-files-found: error
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: pakete
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: pakete/**/*
+          generate_release_notes: true
+          body: |
+            ## Installation
+
+            **Windows:** `ComicDesk-…-Windows-Setup.exe` herunterladen und
+            ausführen. Windows zeigt „Der Computer wurde geschützt“ – auf
+            **Weitere Informationen → Trotzdem ausführen** klicken. Die
+            Warnung erscheint, weil das Programm nicht signiert ist; ein
+            Zertifikat dafür kostet mehrere hundert Euro im Jahr.
+
+            **macOS:** DMG öffnen, ComicDesk in den Programme-Ordner ziehen.
+            Beim ersten Start: **Rechtsklick auf ComicDesk → Öffnen**, dann
+            im Dialog **Öffnen** wählen. Ein Doppelklick allein wird
+            abgelehnt – ebenfalls, weil die App nicht notariell beglaubigt
+            ist. Für Apple Silicon die `arm64`-Fassung, für ältere Macs
+            `x86_64`.
+
+            **Linux:** aus dem Quelltext, siehe README.
