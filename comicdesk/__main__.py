@@ -9,10 +9,11 @@ from PySide6.QtCore import (
 )
 from PySide6.QtWidgets import QApplication
 
+from deskkit import theme
+
 from .appicon import icon as app_icon
 from .i18n import set_language
 from .mainwindow import MainWindow
-from . import theme
 
 
 #: Bekannte, folgenlose Meldungen. Nur genau diese werden geschluckt - alles
