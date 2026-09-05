@@ -1,0 +1,47 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      # requirements.txt zieht deskkit ueber den relativen Pfad "-e ../deskkit"
+      # (siehe README) - dafuer beide Repos als Geschwister im selben
+      # Arbeitsverzeichnis auschecken.
+      - uses: actions/checkout@v4
+        with:
+          path: app
+
+      - uses: actions/checkout@v4
+        with:
+          repository: aaaaaprvdgrwwelt/deskkit
+          path: deskkit
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # PySide6 laesst sich importieren, braucht aber ein paar
+      # System-Bibliotheken, die auf dem Runner nicht vorinstalliert sind.
+      # libicu-dev ausserdem fuer pyicu (Abhaengigkeit von comictagger) -
+      # dafuer gibt es kein vorgebautes Wheel, es wird aus der Quelle gebaut.
+      - name: System-Bibliotheken
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libgl1 libxkbcommon0 libxcb-cursor0 libicu-dev
+
+      - name: Abhaengigkeiten
+        working-directory: app
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+          pip install -e .
+
+      - name: Tests
+        working-directory: app
+        run: pytest -q
