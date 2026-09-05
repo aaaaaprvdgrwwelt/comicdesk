@@ -18,9 +18,12 @@ from PySide6.QtWidgets import (
 
 from comicapi.genericmetadata import GenericMetadata
 
+from deskkit.actions import ActionRegistry
+
 from . import archive
 from .favorites import Favorites
 from .smartlists import SmartLists
+from .helpdialog import HelpDialog
 from .icons import icon as app_icon
 from .i18n import _, set_language
 from .autotagdialog import AutoTagDialog, SettingsDialog
@@ -542,77 +545,70 @@ class MainWindow(QMainWindow):
 
     def _build_actions(self) -> None:
         """Menueleiste mit allem, Werkzeugleiste nur mit dem Haeufigen."""
-        def act(text, shortcut, slot, icon=None, on_view=False):
+        self.actions_map = ActionRegistry(self, _)
+
+        def act(key, text, shortcut, slot, icon=None, on_view=False):
             """on_view: Kuerzel gilt nur im Dateibereich, damit Strg+C/X/V und
             Entf in den Metadaten-Feldern weiterhin normal funktionieren.
             Im Menue bleibt der Eintrag trotzdem jederzeit anklickbar."""
-            a = QAction(_(text), self)
-            if icon:
-                a.setIcon(app_icon(icon))
-            if shortcut:
-                a.setShortcut(QKeySequence(shortcut))
-                a.setShortcutContext(
-                    Qt.WidgetWithChildrenShortcut if on_view else Qt.WindowShortcut)
-            a.triggered.connect(slot)
-            (self.view if on_view else self).addAction(a)
-            return a
+            return self.actions_map.add(
+                key, text, shortcut, slot,
+                icon=app_icon(icon) if icon else None,
+                target=self.view if on_view else None,
+                shortcut_context=(
+                    Qt.WidgetWithChildrenShortcut if on_view else Qt.WindowShortcut),
+            )
 
-        a = self.actions_map = {
-            "up": act("Nach oben", "Alt+Up", self.go_up, "up"),
-            "refresh": act("Aktualisieren", "F5", self.refresh, "refresh"),
-            "read": act("Lesen", "Return", self.open_selected,
-                        "read", on_view=True),
-            "reveal": act("Ordner anzeigen", "Ctrl+G", self.reveal_selected,
-                          on_view=True),
-            "new_folder": act("Neuer Ordner", "Ctrl+Shift+N", self.new_folder,
-                              "folder_new"),
-            "quit": act("Beenden", "Ctrl+Q", self.close),
-            "copy": act("Kopieren", "Ctrl+C", self.copy_selected, on_view=True),
-            "cut": act("Ausschneiden", "Ctrl+X", self.cut_selected, on_view=True),
-            "paste": act("Einfuegen", "Ctrl+V", self.paste, on_view=True),
-            "rename": act("Umbenennen", "F2", self.rename_selected,
-                          "rename", on_view=True),
-            "delete": act("Loeschen", "Del", self.delete_selected,
-                          "delete", on_view=True),
-            "search": act("Suchen", "Ctrl+F", self.focus_search, "search"),
-            "untagged": act("Ungetaggte anzeigen", "Ctrl+U", self.show_untagged),
-            "series": act("Reihen …", "Ctrl+E", self.show_series, "index"),
-            "autotag": act("Automatisch taggen", "Ctrl+T", self.auto_tag,
-                           "tag", on_view=True),
-            "choose_match": act("Treffer wählen …", "Ctrl+Shift+T",
-                                self.choose_match, on_view=True),
-            "clear_tags": act("Tags löschen", None, self.clear_tags,
-                              on_view=True),
-            "move_collection": act("In Sammlung verschieben …", None,
-                                   self.move_selection_to_collection, "folder",
-                                   on_view=True),
-            "rename_tpl": act("Nach Tags benennen", "Ctrl+R",
-                              self.rename_by_template, on_view=True),
-            "pages": act("Seiten verwalten …", "Ctrl+P", self.edit_pages,
-                         on_view=True),
-            "fav_add": act("Zu Favoriten hinzufuegen", "Ctrl+D",
-                           self.toggle_favorite, "star", on_view=True),
-            "fav_remove": act("Aus Favoriten entfernen", None,
-                              self.remove_favorite),
-            "fav_rename": act("Favorit umbenennen", None, self.rename_favorite),
-            "fav_prune": act("Verschwundene Favoriten aufraeumen", None,
-                             self.prune_favorites),
-            "smart_save": act("Suche als Liste speichern …", "Ctrl+Shift+L",
-                              self.save_smart_list, "search"),
-            "smart_edit": act("Abfrage bearbeiten …", None,
-                              self.edit_smart_list),
-            "smart_rename": act("Liste umbenennen", None,
-                                self.rename_smart_list),
-            "smart_remove": act("Liste entfernen", None, self.remove_smart_list),
-            "convert": act("Nach CBZ konvertieren", None, self.convert_selected,
-                           on_view=True),
-            "recompress": act("Bilder konvertieren …", None,
-                              self.recompress_selected, on_view=True),
-            "index": act("Sammlungen …", "Ctrl+Shift+M", self.edit_index, "index"),
-            "settings": act("Einstellungen …", "Ctrl+,", self.open_settings,
-                            "settings"),
-            "about": act("Ueber ComicDesk", None, self.show_about),
-        }
+        a = self.actions_map
+        act("up", "Nach oben", "Alt+Up", self.go_up, "up")
+        act("refresh", "Aktualisieren", "F5", self.refresh, "refresh")
+        act("read", "Lesen", "Return", self.open_selected, "read", on_view=True)
+        act("reveal", "Ordner anzeigen", "Ctrl+G", self.reveal_selected,
+           on_view=True)
+        act("new_folder", "Neuer Ordner", "Ctrl+Shift+N", self.new_folder,
+           "folder_new")
+        act("quit", "Beenden", "Ctrl+Q", self.close)
+        act("copy", "Kopieren", "Ctrl+C", self.copy_selected, on_view=True)
+        act("cut", "Ausschneiden", "Ctrl+X", self.cut_selected, on_view=True)
+        act("paste", "Einfuegen", "Ctrl+V", self.paste, on_view=True)
+        act("rename", "Umbenennen", "F2", self.rename_selected, "rename",
+           on_view=True)
+        act("delete", "Loeschen", "Del", self.delete_selected, "delete",
+           on_view=True)
+        act("search", "Suchen", "Ctrl+F", self.focus_search, "search")
+        act("untagged", "Ungetaggte anzeigen", "Ctrl+U", self.show_untagged)
+        act("series", "Reihen …", "Ctrl+E", self.show_series, "index")
+        act("autotag", "Automatisch taggen", "Ctrl+T", self.auto_tag, "tag",
+           on_view=True)
+        act("choose_match", "Treffer wählen …", "Ctrl+Shift+T",
+           self.choose_match, on_view=True)
+        act("clear_tags", "Tags löschen", None, self.clear_tags, on_view=True)
+        act("move_collection", "In Sammlung verschieben …", None,
+           self.move_selection_to_collection, "folder", on_view=True)
+        act("rename_tpl", "Nach Tags benennen", "Ctrl+R",
+           self.rename_by_template, on_view=True)
+        act("pages", "Seiten verwalten …", "Ctrl+P", self.edit_pages,
+           on_view=True)
+        act("fav_add", "Zu Favoriten hinzufuegen", "Ctrl+D",
+           self.toggle_favorite, "star", on_view=True)
+        act("fav_remove", "Aus Favoriten entfernen", None, self.remove_favorite)
+        act("fav_rename", "Favorit umbenennen", None, self.rename_favorite)
+        act("fav_prune", "Verschwundene Favoriten aufraeumen", None,
+           self.prune_favorites)
+        act("smart_save", "Suche als Liste speichern …", "Ctrl+Shift+L",
+           self.save_smart_list, "search")
+        act("smart_edit", "Abfrage bearbeiten …", None, self.edit_smart_list)
+        act("smart_rename", "Liste umbenennen", None, self.rename_smart_list)
+        act("smart_remove", "Liste entfernen", None, self.remove_smart_list)
+        act("convert", "Nach CBZ konvertieren", None, self.convert_selected,
+           on_view=True)
+        act("recompress", "Bilder konvertieren …", None,
+           self.recompress_selected, on_view=True)
+        act("index", "Sammlungen …", "Ctrl+Shift+M", self.edit_index, "index")
+        act("settings", "Einstellungen …", "Ctrl+,", self.open_settings,
+           "settings")
+        act("help", "Hilfe …", "F1", self.open_help)
+        act("about", "Ueber ComicDesk", None, self.show_about)
 
         # --- Menueleiste ---------------------------------------------
         bar = self.menuBar()
@@ -668,7 +664,9 @@ class MainWindow(QMainWindow):
         menu.addSeparator()
         menu.addAction(a["settings"])
 
-        bar.addMenu(_("&Hilfe")).addAction(a["about"])
+        menu = bar.addMenu(_("&Hilfe"))
+        menu.addAction(a["help"])
+        menu.addAction(a["about"])
 
         # --- Werkzeugleiste: nur was staendig gebraucht wird ----------
         tb = QToolBar(_("Aktionen"))
@@ -1396,6 +1394,9 @@ class MainWindow(QMainWindow):
         dialog = SettingsDialog(self.settings, self, start_tab)
         if dialog.exec() and dialog.language_changed:
             self.apply_language(self.settings.value("language", "auto"))
+
+    def open_help(self) -> None:
+        HelpDialog(self).exec()
 
     def show_about(self) -> None:
         QMessageBox.about(self, _("Ueber ComicDesk"), _(

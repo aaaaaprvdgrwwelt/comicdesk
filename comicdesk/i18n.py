@@ -347,6 +347,8 @@ EN = {
         "written as ComicInfo.xml.\n\n"
         "Metadata from ComicVine and the Grand Comics Database.",
     "Ueber ComicDesk": "About ComicDesk",
+    "Hilfe": "Help",
+    "Hilfe …": "Help …",
 
     # --- Seiten verwalten
     "Seiten verwalten": "Manage pages",
