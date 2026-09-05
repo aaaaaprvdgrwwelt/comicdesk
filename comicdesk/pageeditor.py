@@ -24,8 +24,8 @@ PAGE_ROLE = Qt.UserRole + 1
 class _ThumbWorker(QObject):
     """Laedt die Seitenbilder der Reihe nach in einem eigenen Thread.
 
-    Bewusst sequentiell: ZipFile und fitz.Document vertragen keine parallelen
-    Zugriffe, und fuer die Vorschau reicht das voellig.
+    Bewusst sequentiell: ZipFile und pymupdf.Document vertragen keine
+    parallelen Zugriffe, und fuer die Vorschau reicht das voellig.
     """
 
     ready = Signal(int, QImage)

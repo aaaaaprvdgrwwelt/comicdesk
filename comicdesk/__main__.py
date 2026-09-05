@@ -90,7 +90,7 @@ def selftest() -> int:
 
 def _pdf_ok() -> bool:
     try:
-        import fitz  # noqa: F401
+        import pymupdf  # noqa: F401
     except Exception:  # noqa: BLE001
         return False
     return True

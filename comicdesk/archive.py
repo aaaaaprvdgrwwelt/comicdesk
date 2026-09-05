@@ -415,9 +415,9 @@ class PdfComic(ComicFile):
 
     def __init__(self, path: Path):
         super().__init__(path)
-        import fitz
+        import pymupdf
 
-        self._doc = fitz.open(str(self.path))
+        self._doc = pymupdf.open(str(self.path))
 
     @property
     def sidecar(self) -> Path:
@@ -428,11 +428,11 @@ class PdfComic(ComicFile):
         return self._doc.page_count
 
     def page_bytes(self, index: int) -> bytes:
-        import fitz
+        import pymupdf
 
         page = self._doc.load_page(index)
         zoom = self.RENDER_DPI / 72.0
-        pix = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom), alpha=False)
+        pix = page.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom), alpha=False)
         return pix.tobytes("png")
 
     def _read_cix(self) -> str | None:
@@ -462,7 +462,7 @@ class PdfComic(ComicFile):
     def save_page_order(self, order: list[int]) -> None:
         if not order:
             raise ComicError(_("Ein Comic braucht mindestens eine Seite."))
-        import fitz
+        import pymupdf
 
         tmp = _temp_beside(self.path, ".pdf")
         try:
@@ -475,7 +475,7 @@ class PdfComic(ComicFile):
             tmp.unlink(missing_ok=True)
             raise
         finally:
-            self._doc = fitz.open(str(self.path))
+            self._doc = pymupdf.open(str(self.path))
 
     def close(self) -> None:
         self._doc.close()
