@@ -22,6 +22,9 @@ dependencies = [
     "requests>=2.31",
     # 11.3 bringt AVIF ohne Zusatzpaket mit.
     "pillow>=11.3",
+    # API-Schluessel im System-Schluesselbund statt im Klartext in
+    # QSettings - siehe deskkit.secrets.
+    "keyring>=24",
 ]
 
 [project.optional-dependencies]

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from PySide6.QtCore import QSettings
 
+from deskkit.secrets import get_secret, set_secret
 from deskkit.settings import as_bool as _bool
 
 from .autotag import DEFAULT_THRESHOLD, AutoTagConfig
@@ -31,7 +32,7 @@ class TaggerSettings:
     def load(cls, settings: QSettings) -> TaggerSettings:
         settings.beginGroup("tagger")
         obj = cls(
-            comicvine_key=settings.value("comicvine_key", "") or "",
+            comicvine_key=get_secret(settings, "comicdesk", "comicvine_key"),
             use_comicvine=_bool(settings.value("use_comicvine"), True),
             gcd_path=settings.value("gcd_path", "") or "",
             gcd_language=settings.value("gcd_language", "") or "",
@@ -48,6 +49,9 @@ class TaggerSettings:
     def save(self, settings: QSettings) -> None:
         settings.beginGroup("tagger")
         for key, value in self.__dict__.items():
+            if key == "comicvine_key":
+                set_secret(settings, "comicdesk", key, value)
+                continue
             settings.setValue(key, value)
         settings.endGroup()
         settings.sync()
