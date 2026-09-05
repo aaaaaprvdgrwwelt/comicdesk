@@ -5,17 +5,13 @@ from dataclasses import dataclass
 
 from PySide6.QtCore import QSettings
 
+from deskkit.settings import as_bool as _bool
+
 from .autotag import DEFAULT_THRESHOLD, AutoTagConfig
 from .providers.base import MetadataProvider
 from .providers.anilist import AniListProvider
 from .providers.comicvine import ComicVineProvider
 from .providers.gcd import GcdProvider
-
-
-def _bool(value, default: bool) -> bool:
-    if value is None:
-        return default
-    return str(value).lower() in ("1", "true", "yes")
 
 
 @dataclass
