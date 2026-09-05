@@ -1,3 +1,4 @@
+-e ../deskkit
 PySide6
 pymupdf
 comictagger

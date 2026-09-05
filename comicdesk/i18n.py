@@ -1,5 +1,9 @@
 """Sprachumschaltung.
 
+Der Mechanismus (aktive Sprache verfolgen, Systemsprache erkennen, in der
+Tabelle nachschlagen) steckt in `deskkit.i18n.Translator` - geteilt mit den
+anderen *desk-Apps. Hier liegt nur die App-eigene Uebersetzungstabelle.
+
 Die Quelltext-Strings sind zugleich die Schluessel. Sie sind ASCII-Deutsch
 gehalten, damit sie robust als Schluessel taugen; die Tabelle liefert fuer
 `de` das korrekt umlautete Deutsch und fuer `en` die Uebersetzung. Fehlt ein
@@ -8,33 +12,9 @@ benutzbar, auch wenn eine Uebersetzung vergessen wurde.
 """
 from __future__ import annotations
 
-#: Code -> Anzeigename im Menue.
-LANGUAGES = {"auto": "Automatisch", "de": "Deutsch", "en": "English"}
+from deskkit.i18n import LANGUAGES, Translator, system_language
 
-_current = "de"
-
-
-def system_language() -> str:
-    from PySide6.QtCore import QLocale
-
-    code = QLocale.system().name().split("_")[0].lower()
-    return code if code in ("de", "en") else "en"
-
-
-def set_language(code: str) -> None:
-    global _current
-    _current = system_language() if code == "auto" else (
-        code if code in ("de", "en") else "de")
-
-
-def language() -> str:
-    return _current
-
-
-def _(text: str) -> str:
-    """Uebersetzt `text` in die aktive Sprache."""
-    return TABLE.get(_current, {}).get(text, text)
-
+__all__ = ["LANGUAGES", "system_language", "set_language", "language", "_"]
 
 # ---------------------------------------------------------------------------
 DE = {
@@ -999,3 +979,8 @@ EN = {
 }
 
 TABLE = {"de": DE, "en": EN}
+
+_translator = Translator(TABLE)
+_ = _translator
+set_language = _translator.set_language
+language = _translator.language
