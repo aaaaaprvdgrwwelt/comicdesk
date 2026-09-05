@@ -20,6 +20,11 @@ from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 HIER = Path(SPECPATH).resolve()
 WURZEL = HIER.parent
+#: deskkit liegt als Geschwister-Repo daneben und wird per "pip install -e"
+#: eingebunden (siehe requirements.txt) - PyInstallers statische Analyse
+#: folgt dem editable-Import-Hook nicht von selbst, deshalb Quellordner und
+#: Submodule hier ausdruecklich mitgeben.
+DESKKIT = WURZEL.parent / "deskkit"
 
 datas = [(str(WURZEL / "comicdesk" / "assets"), "comicdesk/assets")]
 datas += collect_data_files("comicapi")
@@ -36,12 +41,13 @@ hiddenimports = [
 ]
 hiddenimports += collect_submodules("comicapi")
 hiddenimports += collect_submodules("comicdesk")
+hiddenimports += collect_submodules("deskkit")
 
 block_cipher = None
 
 a = Analysis(
     [str(HIER / "entry.py")],
-    pathex=[str(WURZEL)],
+    pathex=[str(WURZEL), str(DESKKIT)],
     binaries=[],
     datas=datas,
     hiddenimports=hiddenimports,
