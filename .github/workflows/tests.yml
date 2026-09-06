@@ -13,11 +13,11 @@ jobs:
       # requirements.txt zieht deskkit ueber den relativen Pfad "-e ../deskkit"
       # (siehe README) - dafuer beide Repos als Geschwister im selben
       # Arbeitsverzeichnis auschecken.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           path: app
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: aaaaaprvdgrwwelt/deskkit
           path: deskkit
