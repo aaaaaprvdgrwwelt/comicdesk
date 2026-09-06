@@ -1,8 +1,14 @@
 # ComicDesk
 
+[![Tests](https://github.com/aaaaaprvdgrwwelt/comicdesk/actions/workflows/tests.yml/badge.svg)](https://github.com/aaaaaprvdgrwwelt/comicdesk/actions/workflows/tests.yml)
+
 Ein Dateimanager, der nur Comics kennt: browsen, lesen, taggen, umbenennen,
 kopieren, verschieben, löschen. Python + Qt (PySide6), läuft unter Linux,
-Windows und macOS. Oberfläche auf Deutsch und Englisch.
+Windows und macOS. Oberfläche auf Deutsch und Englisch. Auf demselben
+[deskkit](https://github.com/aaaaaprvdgrwwelt/deskkit)-Fundament wie
+[MovieDesk](https://github.com/aaaaaprvdgrwwelt/moviedesk),
+[BookDesk](https://github.com/aaaaaprvdgrwwelt/bookdesk) und
+[AudioDesk](https://github.com/aaaaaprvdgrwwelt/audiodesk).
 
 Tags werden als `ComicInfo.xml` ins Archiv geschrieben — dasselbe Format, das
 ComicTagger, Komga, Kavita und ComicRack lesen. Automatisches Taggen gegen
@@ -10,9 +16,9 @@ ComicVine oder einen lokalen Dump der Grand Comics Database.
 
 **Projektseite:** <https://aaaaaprvdgrwwelt.github.io/comicdesk/>
 
-> Status: nutzbar, aber jung. Entwickelt und getestet unter Linux; Windows und
-> macOS sollten funktionieren (reines Qt/Python), sind aber ungetestet. Es gibt
-> noch keine automatisierte Testsuite — siehe [Bekannte Grenzen](#bekannte-grenzen).
+> Status: nutzbar. Entwickelt und getestet unter Linux; Windows und macOS
+> sollten funktionieren (reines Qt/Python), sind aber nicht manuell
+> getestet — siehe [Bekannte Grenzen](#bekannte-grenzen).
 
 ## Installation
 
@@ -474,10 +480,19 @@ Strings; fehlt ein Eintrag, erscheint der Schlüssel — die App bleibt nutzbar.
 Eine weitere Quelle anzubinden heißt: `MetadataProvider` ableiten, `available`,
 `search` und `enrich` implementieren, in `config.py` eintragen.
 
+## Entwickeln
+
+```bash
+.venv/bin/pip install -r requirements-dev.txt
+QT_QPA_PLATFORM=offscreen .venv/bin/pytest
+```
+
+Windows-Installer und macOS-Pakete (Apple Silicon + Intel) entstehen per
+PyInstaller + Inno Setup in CI, ausgelöst von einem Tag wie `v0.2.0` —
+siehe [packaging/README.md](packaging/README.md).
+
 ## Bekannte Grenzen
 
-- **Keine automatisierte Testsuite.** Alles wurde manuell und mit
-  Wegwerf-Skripten geprüft.
 - **ComicVine ist nie live gelaufen** — nur gegen nachgebaute API-Antworten.
   Feldnamen und Rollen-Mapping stimmen, das reale Verhalten unter Rate-Limit
   ist ungeprüft.
@@ -485,7 +500,9 @@ Eine weitere Quelle anzubinden heißt: `MetadataProvider` ableiten, `available`,
   synthetische Datenbank mit dem echten Schema. Die Seriensuche nutzt
   `LIKE '%…%'` und dürfte bei ~150.000 Serien zu langsam sein; nötig wäre eine
   FTS5-Volltexttabelle.
-- **Nur unter Linux getestet.**
+- Windows/macOS sind reines Qt/Python und sollten funktionieren, wurden
+  aber nicht manuell auf diesen Plattformen getestet (nur die
+  automatisierte Testsuite läuft auch dort in der CI).
 - Reader ohne Lesefortschritt, Doppelseiten und Manga-Leserichtung.
 - Tags nur einzeln editierbar, kein Batch-Editor.
 - Kein Drag & Drop aus anderen Dateimanagern.
