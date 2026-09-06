@@ -5,8 +5,8 @@ from dataclasses import dataclass, field
 
 from comicapi.genericmetadata import GenericMetadata
 
-from deskkit.matching import normalize_title as normalize_series
-from deskkit.matching import title_similarity as series_similarity
+# Re-exportiert fuer autotag.py - noqa, weil hier selbst ungenutzt.
+from deskkit.matching import title_similarity as series_similarity  # noqa: F401,E402
 
 
 def normalize_issue(number: str | None) -> str:

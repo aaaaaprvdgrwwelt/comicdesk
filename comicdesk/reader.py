@@ -598,7 +598,7 @@ class _Hud(QWidget):
     unten auf, blaettert und zeigt die Position, dann sinkt sie wieder weg.
     """
 
-    def __init__(self, view: QWidget, window: "ReaderWindow"):
+    def __init__(self, view: QWidget, window: ReaderWindow):
         super().__init__(view)
         self._window = window
         self.setAttribute(Qt.WA_StyledBackground, True)

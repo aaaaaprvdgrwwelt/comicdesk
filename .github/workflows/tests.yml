@@ -42,6 +42,10 @@ jobs:
           pip install -r requirements-dev.txt
           pip install -e .
 
+      - name: Lint
+        working-directory: app
+        run: ruff check .
+
       - name: Tests
         working-directory: app
         run: pytest -q

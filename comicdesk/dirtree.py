@@ -23,7 +23,7 @@ class Node:
                  "nid")
 
     def __init__(self, kind: int, label: str, path: Path | None = None,
-                 roots: list[Path] | None = None, parent: "Node | None" = None,
+                 roots: list[Path] | None = None, parent: Node | None = None,
                  row: int = 0):
         self.kind = kind
         self.label = label

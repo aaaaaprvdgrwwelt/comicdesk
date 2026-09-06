@@ -40,3 +40,14 @@ comicdesk = "comicdesk.__main__:main"
 
 [tool.setuptools.packages.find]
 include = ["comicdesk*"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 92
+
+[tool.ruff.lint]
+select = ["E", "F", "UP", "B"]
+ignore = [
+    "E501",  # Zeilenlaenge wird von Hand umgebrochen, nicht erzwungen
+    "B008",  # QModelIndex() als Vorgabewert ist die uebliche Qt-Modell-Signatur
+]

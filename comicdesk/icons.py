@@ -9,7 +9,8 @@ direkt ueber `IconSet` liesse sich das nicht ausdruecken.
 """
 from __future__ import annotations
 
-from deskkit.icons import IconSet, TEMPLATE as _TEMPLATE
+from deskkit.icons import IconSet
+from deskkit.icons import TEMPLATE as _TEMPLATE  # noqa: F401 - siehe oben
 
 #: Strichzeichnungen auf einem 24x24-Raster.
 PATHS = {

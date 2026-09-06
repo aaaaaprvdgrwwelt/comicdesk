@@ -8,7 +8,7 @@ from PySide6.QtCore import (
     QAbstractListModel, QModelIndex, QRect, QSettings, QSize, Qt, QTimer,
 )
 from PySide6.QtGui import (
-    QAction, QColor, QFont, QIcon, QKeySequence, QPainter, QPen, QPixmap,
+    QAction, QColor, QFont, QIcon, QPainter, QPen, QPixmap,
 )
 from PySide6.QtWidgets import (
     QAbstractItemView, QApplication, QComboBox, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListView, QListWidget, QListWidgetItem,
@@ -1852,7 +1852,7 @@ class MainWindow(QMainWindow):
         soll das Schliessen trotzdem durchgehen.
         """
         pending = getattr(self, "_pending_threads", [])
-        for thread, worker in list(pending):
+        for _thread, worker in list(pending):
             if worker is not None:
                 worker.stop()
         for thread, _worker in list(pending):

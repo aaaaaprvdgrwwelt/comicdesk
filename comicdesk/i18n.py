@@ -128,7 +128,6 @@ DE = {
     "Verschwundene Favoriten aufraeumen": "Verschwundene Favoriten aufräumen",
     "„{name}“ zu den Favoriten hinzugefuegt.":
         "„{name}“ zu den Favoriten hinzugefügt.",
-    "Ordner hinzufuegen …": "Ordner hinzufügen …",
     "„{name}“ wird durchsucht …": "„{name}“ wird durchsucht …",
     "Sammlung loeschen": "Sammlung löschen",
     "Sammlung „{name}“ mit {count} indizierten Comics loeschen?\n\n"
@@ -761,11 +760,9 @@ EN = {
     "Jahr": "Year",
     "Monat": "Month",
     "Tag": "Day",
-    "Verlag": "Publisher",
     "Imprint": "Imprint",
     "Genre": "Genre",
     "Sprache (ISO)": "Language (ISO)",
-    "Format": "Format",
     "Story Arc": "Story arc",
     "Serien-Gruppe": "Series group",
     "Altersfreigabe": "Age rating",
@@ -874,7 +871,6 @@ EN = {
     "Wird nach der laufenden Datei beendet …":
         "Stopping after the current file …",
     "Fertig. {summary}": "Done. {summary}",
-    "Wird abgebrochen …": "Cancelling …",
     "Abbruch – die laufende Datei wird noch beendet.":
         "Cancelling - the current file is still being finished.",
     "({seconds} s …)": "({seconds} s …)",
@@ -904,7 +900,6 @@ EN = {
         "dump under “Sources …”.",
 
     # --- Quellen-Dialog
-    "Metadaten-Quellen": "Metadata sources",
     "ComicVine": "ComicVine",
     "ComicVine benutzen": "Use ComicVine",
     "API-Key": "API key",
@@ -973,7 +968,6 @@ EN = {
         "Install with: sudo apt install p7zip-full p7zip-rar",
     "7z konnte {name} nicht entpacken:\n{error}":
         "7z could not extract {name}:\n{error}",
-    "{name} existiert bereits.": "{name} already exists.",
     "ComicVine-Kontingent erschoepft (200 Anfragen/Stunde). Spaeter "
     "weitermachen - bereits geholte Daten sind gecacht.":
         "ComicVine quota exhausted (200 requests per hour). Continue later – "
